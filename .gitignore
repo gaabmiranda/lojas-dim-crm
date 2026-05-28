@@ -1,0 +1,58 @@
+# Dependencies
+node_modules/
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/sdks
+!.yarn/versions
+
+# Next.js
+.next/
+out/
+build/
+.swc/
+
+# Production / standalone build
+*.tsbuildinfo
+next-env.d.ts
+
+# Env files (NUNCA versionar)
+.env
+.env.*
+!.env.example
+
+# Bling secrets (paranoia — Spec risco #9)
+bling app.txt
+bling_tokens.json
+bling_pedidos_*.ndjson
+bling_pedidos_ids.txt
+bling_sync*.log
+bling_schemas.json
+bling-sdk-ref/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.swp
+
+# Test / coverage
+coverage/
+.nyc_output/
+
+# Drizzle journal/meta — mantemos os SQLs versionados
+drizzle/migrations/meta/_journal.json.bak
+
+# Docker volumes / dev data
+postgres-data/
+docker-volumes/

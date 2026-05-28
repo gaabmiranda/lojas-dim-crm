@@ -1,0 +1,37 @@
+{
+  "name": "03 - Cron 48h sem resposta",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": { "interval": [{ "field": "cronExpression", "expression": "0 9 * * *" }] }
+      },
+      "id": "schedule-1",
+      "name": "Schedule 9h",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.CRM_BASE_URL }}/api/cron/transitions",
+        "method": "POST",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "X-N8N-Secret", "value": "={{ $env.N8N_SHARED_SECRET }}" }]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "jsonBody": "={\"tipo\":\"sem_resposta\"}",
+        "options": {}
+      },
+      "id": "http-1",
+      "name": "POST tipo=sem_resposta",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300]
+    }
+  ],
+  "connections": {
+    "Schedule 9h": { "main": [[{ "node": "POST tipo=sem_resposta", "type": "main", "index": 0 }]] }
+  }
+}

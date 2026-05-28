@@ -1,0 +1,37 @@
+{
+  "name": "05 - Cron Arquivar Reativação 3x",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": { "interval": [{ "field": "cronExpression", "expression": "0 11 * * *" }] }
+      },
+      "id": "schedule-1",
+      "name": "Schedule 11h",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.CRM_BASE_URL }}/api/cron/transitions",
+        "method": "POST",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "X-N8N-Secret", "value": "={{ $env.N8N_SHARED_SECRET }}" }]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "jsonBody": "={\"tipo\":\"arquivar\"}",
+        "options": {}
+      },
+      "id": "http-1",
+      "name": "POST tipo=arquivar",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300]
+    }
+  ],
+  "connections": {
+    "Schedule 11h": { "main": [[{ "node": "POST tipo=arquivar", "type": "main", "index": 0 }]] }
+  }
+}

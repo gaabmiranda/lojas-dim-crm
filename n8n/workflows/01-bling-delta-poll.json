@@ -1,0 +1,36 @@
+{
+  "name": "01 - Bling Delta Poll (a cada 5min)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": { "interval": [{ "field": "minutes", "minutesInterval": 5 }] }
+      },
+      "id": "schedule-1",
+      "name": "Schedule",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [240, 300],
+      "notes": "TZ America/Sao_Paulo via env do container"
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.CRM_BASE_URL }}/api/sync/bling/delta",
+        "method": "POST",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "X-N8N-Secret", "value": "={{ $env.N8N_SHARED_SECRET }}" }]
+        },
+        "sendBody": false,
+        "options": {}
+      },
+      "id": "http-1",
+      "name": "Trigger sync delta",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300]
+    }
+  ],
+  "connections": {
+    "Schedule": { "main": [[{ "node": "Trigger sync delta", "type": "main", "index": 0 }]] }
+  }
+}
