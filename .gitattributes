@@ -1,0 +1,13 @@
+# Força LF em arquivos que rodam em Linux (container) mesmo quando editados no Windows.
+*.sh text eol=lf
+Dockerfile text eol=lf
+.dockerignore text eol=lf
+entrypoint.sh text eol=lf
+
+# SQL migrations: LF (Postgres/Linux).
+*.sql text eol=lf
+
+# JSON/YAML: LF é padrão moderno.
+*.json text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
