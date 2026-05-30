@@ -51,7 +51,7 @@ npm run dev
 |---------|-----------|
 | `npm run dev` | Next dev em :3000 com hot-reload |
 | `npm run build` | Build production (`.next/standalone`) |
-| `npm run test` | Vitest (79+ testes — kanban, time, validators, bling-mapper, templates, webhooks) |
+| `npm run test` | Vitest (115 testes — kanban, time, validators, bling-mapper, templates, webhooks, chatwoot, cards) |
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run lint` | ESLint via `next lint` |
 | `npm run db:studio` | Drizzle Studio (UI do DB) |
