@@ -34,9 +34,12 @@ COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
-# migrate-prod.js é bundle standalone — só copiamos o JS + SQL.
+# Bundles standalone (esbuild) — migrate + seeds idempotentes + admin (sob demanda).
 COPY --from=builder --chown=nextjs:nodejs /app/drizzle ./drizzle
 COPY --from=builder --chown=nextjs:nodejs /app/scripts/migrate-prod.js ./scripts/migrate-prod.js
+COPY --from=builder --chown=nextjs:nodejs /app/scripts/seed-templates.js ./scripts/seed-templates.js
+COPY --from=builder --chown=nextjs:nodejs /app/scripts/create-admin.js ./scripts/create-admin.js
+COPY --from=builder --chown=nextjs:nodejs /app/db/seed/feature_flags.js ./scripts/feature_flags.js
 
 COPY --chown=nextjs:nodejs entrypoint.sh ./entrypoint.sh
 RUN chmod +x ./entrypoint.sh
