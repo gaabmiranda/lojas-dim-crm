@@ -13,9 +13,8 @@ COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
 
-# Compila o script de migrate pra JS (rodável sem tsx em produção).
-RUN npx tsc --skipLibCheck --target ES2022 --module nodenext --moduleResolution nodenext --esModuleInterop true --outDir /tmp/built-scripts scripts/migrate-prod.ts \
-  && cp /tmp/built-scripts/scripts/migrate-prod.js scripts/migrate-prod.js
+# scripts/migrate-prod.js já é bundle standalone (gerado localmente via esbuild,
+# inclui drizzle-orm + postgres + dotenv). Não precisa compilar aqui.
 
 # ─── runner ───────────────────────────────────────────────────────────────
 FROM node:20-alpine AS runner
@@ -35,12 +34,9 @@ COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
-# Para o migrate-prod: precisa do SQL gerado + script JS + drizzle-orm runtime.
+# migrate-prod.js é bundle standalone — só copiamos o JS + SQL.
 COPY --from=builder --chown=nextjs:nodejs /app/drizzle ./drizzle
 COPY --from=builder --chown=nextjs:nodejs /app/scripts/migrate-prod.js ./scripts/migrate-prod.js
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/drizzle-orm ./node_modules/drizzle-orm
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/postgres ./node_modules/postgres
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/dotenv ./node_modules/dotenv
 
 COPY --chown=nextjs:nodejs entrypoint.sh ./entrypoint.sh
 RUN chmod +x ./entrypoint.sh
