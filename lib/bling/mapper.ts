@@ -38,7 +38,8 @@ function parseDate(s: string | undefined): Date | null {
   }
   const [, y, mo, d] = m;
   // BRT = UTC-3 (sem horário de verão). Meia-noite BRT = 03:00 UTC.
-  return new Date(`${y}-${mo}-${d}T03:00:00Z`);
+  const dt = new Date(`${y}-${mo}-${d}T03:00:00Z`);
+  return Number.isNaN(dt.getTime()) ? null : dt;
 }
 
 export interface MappedPedido {
