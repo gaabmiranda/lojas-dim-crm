@@ -23,14 +23,12 @@ export async function seedFeatureFlags(): Promise<void> {
   }
 }
 
-if (process.argv[1]?.endsWith('feature_flags.ts')) {
-  seedFeatureFlags()
-    .then(() => {
-      console.log(`✓ ${BASE_FLAGS.length} feature flags base garantidas.`);
-      process.exit(0);
-    })
-    .catch((err) => {
-      console.error('Erro ao popular feature flags:', err);
-      process.exit(1);
-    });
-}
+seedFeatureFlags()
+  .then(() => {
+    console.log(`✓ ${BASE_FLAGS.length} feature flags base garantidas.`);
+    process.exit(0);
+  })
+  .catch((err) => {
+    console.error('Erro ao popular feature flags:', err);
+    process.exit(1);
+  });

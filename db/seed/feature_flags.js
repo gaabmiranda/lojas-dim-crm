@@ -4329,7 +4329,8 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
     query.statement.columns = Array(length2);
     for (let i = 0; i < length2; ++i) {
       start = index2;
-      while (x[index2++] !== 0) ;
+      while (x[index2++] !== 0)
+        ;
       const table = x.readUInt32BE(index2);
       const number = x.readUInt16BE(index2 + 4);
       const type = x.readUInt32BE(index2 + 6);
@@ -4426,7 +4427,8 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
     types2.forEach(({ oid, typarray }) => addArrayType(oid, typarray));
   }
   function addArrayType(oid, typarray) {
-    if (!!options.parsers[typarray] && !!options.serializers[typarray]) return;
+    if (!!options.parsers[typarray] && !!options.serializers[typarray])
+      return;
     const parser = options.parsers[oid];
     options.shared.typeArrayMap[oid] = typarray;
     options.parsers[typarray] = (xs) => arrayParser(xs, parser, typarray);
@@ -4464,7 +4466,8 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
     if (!onnotify)
       return;
     let index2 = 9;
-    while (x[index2++] !== 0) ;
+    while (x[index2++] !== 0)
+      ;
     onnotify(
       x.toString("utf8", 9, index2 - 1),
       x.toString("utf8", index2, x.length - 1)
@@ -9125,7 +9128,8 @@ function buildPool() {
   });
 }
 function ensurePool() {
-  if (!globalThis.__dbPool) globalThis.__dbPool = buildPool();
+  if (!globalThis.__dbPool)
+    globalThis.__dbPool = buildPool();
   return globalThis.__dbPool;
 }
 function ensureDb() {
@@ -9172,15 +9176,13 @@ async function seedFeatureFlags() {
     });
   }
 }
-if (process.argv[1]?.endsWith("feature_flags.ts")) {
-  seedFeatureFlags().then(() => {
-    console.log(`\u2713 ${BASE_FLAGS.length} feature flags base garantidas.`);
-    process.exit(0);
-  }).catch((err) => {
-    console.error("Erro ao popular feature flags:", err);
-    process.exit(1);
-  });
-}
+seedFeatureFlags().then(() => {
+  console.log(`\u2713 ${BASE_FLAGS.length} feature flags base garantidas.`);
+  process.exit(0);
+}).catch((err) => {
+  console.error("Erro ao popular feature flags:", err);
+  process.exit(1);
+});
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
   seedFeatureFlags
