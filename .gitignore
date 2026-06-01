@@ -56,3 +56,9 @@ drizzle/migrations/meta/_journal.json.bak
 # Docker volumes / dev data
 postgres-data/
 docker-volumes/
+
+# Smoke test screenshots (artefatos de CI)
+smoke-screenshots/
+
+# Scripts de deploy local com credenciais (one-shot, não versionar)
+scripts/deploy-coolify.ps1
