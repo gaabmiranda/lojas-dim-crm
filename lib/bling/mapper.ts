@@ -18,7 +18,7 @@ export function extrairTelefone(c: BlingContato): string | undefined {
 
 export function mapContato(c: BlingContato): NewContato {
   return {
-    idBling: BigInt(c.id),
+    idBling: Number(c.id),
     nome: c.nome ?? '',
     telefone: extrairTelefone(c),
     email: c.email,
@@ -51,7 +51,7 @@ export interface MappedPedido {
 // (depende de lookup/upsert do contato).
 export function mapPedido(p: BlingPedidoVenda, contatoIdInterno: number): MappedPedido {
   const pedido: NewPedido = {
-    idBling: BigInt(p.id),
+    idBling: Number(p.id),
     contatoId: contatoIdInterno,
     numero: p.numero != null ? String(p.numero) : null,
     data: parseDate(p.data) as NewPedido['data'],

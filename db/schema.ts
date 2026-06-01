@@ -39,7 +39,7 @@ export const contatos = pgTable(
   'contatos',
   {
     id: serial('id').primaryKey(),
-    idBling: bigint('id_bling', { mode: 'bigint' }).notNull(),
+    idBling: bigint('id_bling', { mode: 'number' }).notNull(),
     nome: text('nome').notNull(),
     telefone: text('telefone'),
     email: text('email'),
@@ -65,7 +65,7 @@ export const pedidos = pgTable(
   'pedidos',
   {
     id: serial('id').primaryKey(),
-    idBling: bigint('id_bling', { mode: 'bigint' }).notNull(),
+    idBling: bigint('id_bling', { mode: 'number' }).notNull(),
     contatoId: integer('contato_id')
       .notNull()
       .references(() => contatos.id),

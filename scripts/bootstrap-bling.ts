@@ -100,14 +100,14 @@ async function main() {
   // ── 2. Carregar IDs existentes em memória (evita lookups individuais) ─────
   console.log('\n[1/5] Carregando IDs existentes…');
   const existingRows = await db.select({ id: contatos.id, idBling: contatos.idBling }).from(contatos);
-  const contatoMap = new Map<bigint, number>(existingRows.map((r) => [r.idBling, r.id]));
+  const contatoMap = new Map<number, number>(existingRows.map((r) => [r.idBling, r.id]));
   console.log(`  ${contatoMap.size} contatos já no banco.`);
 
   // ── 3. Importar contatos completos (se arquivo existe) ────────────────────
   if (contatosPath) {
     console.log('\n[2/5] Lendo contatos…');
     const rawContatos = await streamLines(contatosPath, (l) => JSON.parse(l) as BlingContato);
-    const novosContatos = rawContatos.filter((c) => !contatoMap.has(BigInt(c.id)));
+    const novosContatos = rawContatos.filter((c) => !contatoMap.has(Number(c.id)));
     console.log(`  ${rawContatos.length} lidos, ${novosContatos.length} novos`);
 
     await chunkInsert('contatos', novosContatos, BATCH_CONTATOS, async (batch) => {
@@ -145,7 +145,7 @@ async function main() {
   console.log('\n[4/5] Verificando contatos faltantes…');
   const contatosFaltantes: BlingContato[] = [];
   for (const p of rawPedidos) {
-    const idBling = BigInt(p.contato.id);
+    const idBling = Number(p.contato.id);
     if (!contatoMap.has(idBling)) {
       contatosFaltantes.push({ id: p.contato.id, nome: p.contato.nome ?? 'Cliente sem nome', situacao: 'A' });
       contatoMap.set(idBling, -1); // placeholder para evitar duplicata no loop
@@ -177,7 +177,7 @@ async function main() {
   // ── 6. Inserir pedidos + itens em batch ───────────────────────────────────
   console.log('\n[5/5] Inserindo pedidos e itens…');
   const allItens: Array<{
-    pedidoIdBling: bigint;
+    pedidoIdBling: number;
     descricao: string;
     quantidade: string | null;
     valorUnitario: string | null;
@@ -185,14 +185,14 @@ async function main() {
   }> = [];
 
   // Mapeia idBling do pedido → id interno (preenchido após insert)
-  const pedidoIdMap = new Map<bigint, number>();
+  const pedidoIdMap = new Map<number, number>();
 
   await chunkInsert('pedidos', rawPedidos, BATCH_PEDIDOS, async (batch) => {
     const mappedPedidos: typeof pedidos.$inferInsert[] = [];
     const itensBatch: typeof allItens[number][] = [];
 
     for (const p of batch) {
-      const contatoId = contatoMap.get(BigInt(p.contato.id));
+      const contatoId = contatoMap.get(Number(p.contato.id));
       if (!contatoId || contatoId === -1) continue; // não deveria acontecer após passo 4
       const { pedido, itens } = mapPedido(p, contatoId);
       mappedPedidos.push(pedido);
@@ -235,14 +235,14 @@ async function main() {
     for (const item of itensBatch) {
       const pedidoId = pedidoIdMap.get(item.pedidoIdBling);
       if (pedidoId) {
-        allItens.push({ ...item, pedidoIdBling: BigInt(pedidoId) }); // reutiliza campo como pedidoId interno
+        allItens.push({ ...item, pedidoIdBling: pedidoId }); // reutiliza campo como pedidoId interno
       }
     }
   });
 
   // Inserir todos os itens em batch
   const itensParaInserir = allItens.map((i) => ({
-    pedidoId: Number(i.pedidoIdBling), // aqui já é o ID interno
+    pedidoId: i.pedidoIdBling, // aqui já é o ID interno
     descricao: i.descricao,
     quantidade: i.quantidade,
     valorUnitario: i.valorUnitario,
@@ -256,9 +256,9 @@ async function main() {
   }
 
   // ── Resumo final ──────────────────────────────────────────────────────────
-  const [{ nContatos }] = await db.select({ nContatos: drizzleSql<number>`count(*)::int` }).from(contatos);
-  const [{ nPedidos }] = await db.select({ nPedidos: drizzleSql<number>`count(*)::int` }).from(pedidos);
-  const [{ nItens }] = await db.select({ nItens: drizzleSql<number>`count(*)::int` }).from(pedidoItens);
+  const nContatos = (await db.select({ n: drizzleSql<number>`count(*)::int` }).from(contatos))[0]?.n ?? 0;
+  const nPedidos = (await db.select({ n: drizzleSql<number>`count(*)::int` }).from(pedidos))[0]?.n ?? 0;
+  const nItens = (await db.select({ n: drizzleSql<number>`count(*)::int` }).from(pedidoItens))[0]?.n ?? 0;
 
   console.log('\n✓ Bootstrap concluído.');
   console.log(`  contatos:     ${nContatos}`);

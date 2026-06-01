@@ -78,8 +78,8 @@ export async function POST(req: Request) {
   return NextResponse.json({ ok: true });
 }
 
-async function processarPedidoBling(pedidoIdBling: bigint): Promise<void> {
-  const blingPedido = await getPedido(Number(pedidoIdBling));
+async function processarPedidoBling(pedidoIdBling: number): Promise<void> {
+  const blingPedido = await getPedido(pedidoIdBling);
 
   await db.transaction(async (tx) => {
     // Upsert contato (stub se necessário).

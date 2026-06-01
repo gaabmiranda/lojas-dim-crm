@@ -17,7 +17,7 @@ describe('bling webhook — schema', () => {
     const parsed = blingWebhookSchema.safeParse(payload);
     expect(parsed.success).toBe(true);
     if (parsed.success) {
-      expect(parsed.data.dados.id).toBe(17592187232931n);
+      expect(parsed.data.dados.id).toBe(17592187232931);
     }
   });
 

@@ -25,7 +25,7 @@ describe('extrairTelefone', () => {
 });
 
 describe('mapContato', () => {
-  it('preenche campos básicos + idBling como bigint', () => {
+  it('preenche campos básicos + idBling como number', () => {
     const blingContato: BlingContato = {
       id: 17592187232931,
       nome: 'João da Silva',
@@ -34,7 +34,7 @@ describe('mapContato', () => {
       situacao: 'A',
     };
     const m = mapContato(blingContato);
-    expect(m.idBling).toBe(17592187232931n);
+    expect(m.idBling).toBe(17592187232931);
     expect(m.nome).toBe('João da Silva');
     expect(m.email).toBe('joao@example.com');
     expect(m.telefone).toBe('38999998888');
@@ -44,7 +44,7 @@ describe('mapContato', () => {
 
   it('tolera campos faltantes', () => {
     const m = mapContato({ id: 1, nome: 'Mínimo' });
-    expect(m.idBling).toBe(1n);
+    expect(m.idBling).toBe(1);
     expect(m.nome).toBe('Mínimo');
     expect(m.telefone).toBeUndefined();
   });
@@ -68,7 +68,7 @@ describe('mapPedido', () => {
 
   it('mapeia campos principais', () => {
     const { pedido, itens } = mapPedido(sample, 999);
-    expect(pedido.idBling).toBe(42n);
+    expect(pedido.idBling).toBe(42);
     expect(pedido.contatoId).toBe(999);
     expect(pedido.numero).toBe('1001');
     expect(pedido.situacaoId).toBe(101);

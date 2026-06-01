@@ -3,15 +3,15 @@ import { bigintLike, boolString, dateBR, phoneBR } from '@/lib/validators/shared
 
 describe('bigintLike', () => {
   it('aceita string numérica', () => {
-    expect(bigintLike.parse('17592187232931')).toBe(17592187232931n);
+    expect(bigintLike.parse('17592187232931')).toBe(17592187232931);
   });
 
   it('aceita number inteiro', () => {
-    expect(bigintLike.parse(12345)).toBe(12345n);
+    expect(bigintLike.parse(12345)).toBe(12345);
   });
 
   it('aceita bigint direto', () => {
-    expect(bigintLike.parse(99n)).toBe(99n);
+    expect(bigintLike.parse(99n)).toBe(99);
   });
 
   it('rejeita string não-numérica', () => {

@@ -1,11 +1,11 @@
 import { z } from 'zod';
 
-// Bling envia IDs como number ou string dependendo do endpoint. Aceitamos ambos e convertemos pra bigint.
+// Bling envia IDs como number ou string dependendo do endpoint. Aceitamos ambos e convertemos pra number.
 export const bigintLike = z
   .union([z.string(), z.number(), z.bigint()])
   .transform((v, ctx) => {
     try {
-      if (typeof v === 'bigint') return v;
+      if (typeof v === 'bigint') return Number(v);
       if (typeof v === 'number') {
         if (!Number.isFinite(v) || !Number.isInteger(v)) {
           ctx.addIssue({
@@ -14,7 +14,7 @@ export const bigintLike = z
           });
           return z.NEVER;
         }
-        return BigInt(v);
+        return v;
       }
       const trimmed = v.trim();
       if (!/^-?\d+$/.test(trimmed)) {
@@ -24,11 +24,11 @@ export const bigintLike = z
         });
         return z.NEVER;
       }
-      return BigInt(trimmed);
+      return Number(trimmed);
     } catch {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: 'falha ao converter em bigint',
+        message: 'falha ao converter em number',
       });
       return z.NEVER;
     }
