@@ -3,7 +3,7 @@ FROM node:20-alpine AS deps
 WORKDIR /app
 RUN apk add --no-cache libc6-compat
 COPY package.json package-lock.json* ./
-RUN PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm ci
+RUN NODE_ENV=development PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm ci
 
 # ─── builder ──────────────────────────────────────────────────────────────
 FROM node:20-alpine AS builder
