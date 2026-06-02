@@ -16,6 +16,7 @@ const PUBLIC_PATHS = [
   '/api/webhooks',
   '/api/sync',
   '/api/cron',
+  '/api/health',
   '/_next',
   '/favicon.ico',
 ];
