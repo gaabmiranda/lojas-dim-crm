@@ -26,7 +26,7 @@ ENV TZ=America/Sao_Paulo
 
 RUN addgroup --system --gid 1001 nodejs \
     && adduser --system --uid 1001 nextjs \
-    && apk add --no-cache tzdata \
+    && apk add --no-cache tzdata curl \
     && cp /usr/share/zoneinfo/America/Sao_Paulo /etc/localtime \
     && echo "America/Sao_Paulo" > /etc/timezone
 
