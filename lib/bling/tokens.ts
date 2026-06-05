@@ -1,4 +1,4 @@
-import { sql as drizzleSql } from 'drizzle-orm';
+import { sql as drizzleSql, eq } from 'drizzle-orm';
 import { db } from '@/db/client';
 import { blingTokens, type BlingToken } from '@/db/schema';
 import type { BlingTokenResponse } from './types';
@@ -52,10 +52,13 @@ export async function refreshTokens(): Promise<BlingToken> {
 
   return await db.transaction(async (tx) => {
     // SELECT FOR UPDATE — bloqueia outros refreshs concorrentes.
-    const lockedRows = await tx.execute(
-      drizzleSql`SELECT * FROM bling_tokens WHERE id = 1 FOR UPDATE`,
-    );
-    const locked = (lockedRows as unknown as BlingToken[])[0];
+    // Usa ORM (não raw SQL) para garantir mapeamento camelCase correto dos campos.
+    const lockedRows = await tx
+      .select()
+      .from(blingTokens)
+      .where(eq(blingTokens.id, 1))
+      .for('update');
+    const locked = lockedRows[0];
     if (!locked) {
       throw new Error(
         'Tabela bling_tokens vazia. Execute fluxo OAuth inicial pra popular o registro singleton.',
