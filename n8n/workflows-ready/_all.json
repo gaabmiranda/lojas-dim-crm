@@ -1,0 +1,185 @@
+﻿[{
+  "name": "01 - Bling Delta Poll (a cada 5min)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": { "interval": [{ "field": "minutes", "minutesInterval": 5 }] }
+      },
+      "id": "schedule-1",
+      "name": "Schedule",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [240, 300],
+      "notes": "TZ America/Sao_Paulo via env do container"
+    },
+    {
+      "parameters": {
+        "url": "https://crm.g7business.com/api/sync/bling/delta",
+        "method": "POST",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "X-N8N-Secret", "value": "m6ACKrVj8qNX0iQqA2eOPSzh9L0n5_PT" }]
+        },
+        "sendBody": false,
+        "options": {}
+      },
+      "id": "http-1",
+      "name": "Trigger sync delta",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300]
+    }
+  ],
+  "connections": {
+    "Schedule": { "main": [[{ "node": "Trigger sync delta", "type": "main", "index": 0 }]] }
+  }
+}
+,{
+  "name": "02 - Cron D+14 (pendente â†’ em_contato)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": { "interval": [{ "field": "cronExpression", "expression": "0 8 * * *" }] }
+      },
+      "id": "schedule-1",
+      "name": "Schedule 8h",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "url": "https://crm.g7business.com/api/cron/transitions",
+        "method": "POST",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "X-N8N-Secret", "value": "m6ACKrVj8qNX0iQqA2eOPSzh9L0n5_PT" }]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "jsonBody": "={\"tipo\":\"d14\"}",
+        "options": {}
+      },
+      "id": "http-1",
+      "name": "POST /api/cron/transitions tipo=d14",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300]
+    }
+  ],
+  "connections": {
+    "Schedule 8h": { "main": [[{ "node": "POST /api/cron/transitions tipo=d14", "type": "main", "index": 0 }]] }
+  }
+}
+,{
+  "name": "03 - Cron 48h sem resposta",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": { "interval": [{ "field": "cronExpression", "expression": "0 9 * * *" }] }
+      },
+      "id": "schedule-1",
+      "name": "Schedule 9h",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "url": "https://crm.g7business.com/api/cron/transitions",
+        "method": "POST",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "X-N8N-Secret", "value": "m6ACKrVj8qNX0iQqA2eOPSzh9L0n5_PT" }]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "jsonBody": "={\"tipo\":\"sem_resposta\"}",
+        "options": {}
+      },
+      "id": "http-1",
+      "name": "POST tipo=sem_resposta",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300]
+    }
+  ],
+  "connections": {
+    "Schedule 9h": { "main": [[{ "node": "POST tipo=sem_resposta", "type": "main", "index": 0 }]] }
+  }
+}
+,{
+  "name": "04 - Cron D+90 ReativaÃ§Ã£o",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": { "interval": [{ "field": "cronExpression", "expression": "0 10 * * *" }] }
+      },
+      "id": "schedule-1",
+      "name": "Schedule 10h",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "url": "https://crm.g7business.com/api/cron/transitions",
+        "method": "POST",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "X-N8N-Secret", "value": "m6ACKrVj8qNX0iQqA2eOPSzh9L0n5_PT" }]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "jsonBody": "={\"tipo\":\"reativacao\"}",
+        "options": {}
+      },
+      "id": "http-1",
+      "name": "POST tipo=reativacao",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300]
+    }
+  ],
+  "connections": {
+    "Schedule 10h": { "main": [[{ "node": "POST tipo=reativacao", "type": "main", "index": 0 }]] }
+  }
+}
+,{
+  "name": "05 - Cron Arquivar ReativaÃ§Ã£o 3x",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": { "interval": [{ "field": "cronExpression", "expression": "0 11 * * *" }] }
+      },
+      "id": "schedule-1",
+      "name": "Schedule 11h",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "url": "https://crm.g7business.com/api/cron/transitions",
+        "method": "POST",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "X-N8N-Secret", "value": "m6ACKrVj8qNX0iQqA2eOPSzh9L0n5_PT" }]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "jsonBody": "={\"tipo\":\"arquivar\"}",
+        "options": {}
+      },
+      "id": "http-1",
+      "name": "POST tipo=arquivar",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300]
+    }
+  ],
+  "connections": {
+    "Schedule 11h": { "main": [[{ "node": "POST tipo=arquivar", "type": "main", "index": 0 }]] }
+  }
+}
+]
