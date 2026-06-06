@@ -85,8 +85,11 @@ export async function PATCH(req: Request, { params }: RouteParams) {
     payload: { changes: parsed.data, by: session.user.id },
   });
 
-  // Quando vendedor move pos_venda → finalizado, agenda reativação D+90 automaticamente.
+  // Quando vendedor move pos_venda → finalizado, arquiva o card e agenda reativação D+90.
+  // O card vai para 'arquivo' (não fica em 'finalizado') para liberar o unique index parcial
+  // (cards_contato_ativo_unique WHERE coluna != 'arquivo'), permitindo criar o card de reativação.
   if (parsed.data.coluna === 'finalizado' && updated.tipo === 'pos_venda') {
+    await db.update(cards).set({ coluna: 'arquivo', atualizadoEm: drizzleSql`now()` }).where(eq(cards.id, id));
     const dpa = addDays(new Date(), 90).toJSDate();
     try {
       await db.insert(cards).values({
@@ -98,7 +101,7 @@ export async function PATCH(req: Request, { params }: RouteParams) {
         tentativasReativacao: 0,
       });
     } catch {
-      // Partial unique index: já existe card ativo para o contato — noop.
+      // Já existe card ativo para este contato — noop.
     }
   }
 
