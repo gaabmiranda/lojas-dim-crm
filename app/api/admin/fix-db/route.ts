@@ -24,7 +24,21 @@ export async function GET(req: NextRequest) {
     WHERE table_name = '__drizzle_migrations'
   `);
 
-  return NextResponse.json({ constraints, indexes, migrationsTableExists });
+  // Teste real: insert com ON CONFLICT para confirmar que a constraint funciona
+  let onConflictTest: string;
+  try {
+    await db.execute(sql`
+      INSERT INTO contatos (id_bling, nome, situacao_bling)
+      VALUES (-9999999, '__FIX_DB_TEST__', 'A')
+      ON CONFLICT (id_bling) DO UPDATE SET nome = '__FIX_DB_TEST__'
+    `);
+    await db.execute(sql`DELETE FROM contatos WHERE id_bling = -9999999`);
+    onConflictTest = 'OK — constraint funciona';
+  } catch (e: unknown) {
+    onConflictTest = `FALHOU: ${(e as Error).message}`;
+  }
+
+  return NextResponse.json({ constraints, indexes, migrationsTableExists, onConflictTest });
 }
 
 export async function POST(req: NextRequest) {
