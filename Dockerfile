@@ -9,6 +9,8 @@ RUN NODE_ENV=development PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm ci
 FROM node:20-alpine AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
+# Incrementar CACHE_BUST força rebuild limpo quando o cache do BuildKit ficar stale.
+ARG CACHE_BUST=20260606
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_OPTIONS=--max-old-space-size=1536
