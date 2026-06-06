@@ -86,22 +86,52 @@ export async function PATCH(req: Request, { params }: RouteParams) {
   });
 
   // Quando vendedor move pos_venda → finalizado, arquiva o card e agenda reativação D+90.
-  // O card vai para 'arquivo' (não fica em 'finalizado') para liberar o unique index parcial
-  // (cards_contato_ativo_unique WHERE coluna != 'arquivo'), permitindo criar o card de reativação.
+  // Executado em transação: arquivar libera o unique index parcial (WHERE coluna != 'arquivo'),
+  // depois o insert de reativação é feito atomicamente. Interrupção entre os dois não deixa
+  // o contato sem card ativo.
   if (parsed.data.coluna === 'finalizado' && updated.tipo === 'pos_venda') {
-    await db.update(cards).set({ coluna: 'arquivo', atualizadoEm: drizzleSql`now()` }).where(eq(cards.id, id));
     const dpa = addDays(new Date(), 90).toJSDate();
-    try {
-      await db.insert(cards).values({
-        contatoId: updated.contatoId,
-        tipo: 'reativacao',
-        coluna: 'pendente',
-        nomeExibido: `Reativação · ${updated.nomeExibido}`,
-        dataPrevistaAcao: dpa,
-        tentativasReativacao: 0,
+
+    const [arquivado] = await db.transaction(async (tx) => {
+      const [arq] = await tx
+        .update(cards)
+        .set({ coluna: 'arquivo', atualizadoEm: drizzleSql`now()` })
+        .where(eq(cards.id, id))
+        .returning();
+
+      try {
+        await tx.insert(cards).values({
+          contatoId: updated.contatoId,
+          tipo: 'reativacao',
+          coluna: 'pendente',
+          nomeExibido: `Reativação · ${updated.nomeExibido}`,
+          dataPrevistaAcao: dpa,
+          tentativasReativacao: 0,
+        });
+        await logEvent({
+          tipo: 'card_criado_auto',
+          origem: 'api_interna',
+          cardId: id,
+          payload: { motivo: 'pos_venda_finalizado_d90', contatoId: updated.contatoId, dpa },
+        });
+      } catch (err) {
+        // 23505 = unique_violation: já existe card ativo para o contato → noop legítimo.
+        // Qualquer outro erro é re-lançado para rollback da transação.
+        const pgCode = (err as { code?: string }).code;
+        if (pgCode !== '23505') throw err;
+      }
+
+      return [arq];
+    });
+
+    if (arquivado) {
+      await logEvent({
+        tipo: 'card_patch',
+        origem: 'api_interna',
+        cardId: id,
+        payload: { changes: { coluna: 'arquivo' }, by: 'sistema_d90' },
       });
-    } catch {
-      // Já existe card ativo para este contato — noop.
+      return NextResponse.json(arquivado);
     }
   }
 
