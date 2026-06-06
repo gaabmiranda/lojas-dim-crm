@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sql } from 'drizzle-orm';
 import { db } from '@/db/client';
+import { contatos } from '@/db/schema';
 
 export async function GET(req: NextRequest) {
   if (req.headers.get('x-admin-secret') !== process.env.N8N_SHARED_SECRET) {
@@ -24,8 +25,8 @@ export async function GET(req: NextRequest) {
     WHERE table_name = '__drizzle_migrations'
   `);
 
-  // Teste real: insert com ON CONFLICT para confirmar que a constraint funciona
-  let onConflictTest: string;
+  // Teste 1: SQL raw com ON CONFLICT
+  let onConflictTestRaw: string;
   try {
     await db.execute(sql`
       INSERT INTO contatos (id_bling, nome, situacao_bling)
@@ -33,12 +34,29 @@ export async function GET(req: NextRequest) {
       ON CONFLICT (id_bling) DO UPDATE SET nome = '__FIX_DB_TEST__'
     `);
     await db.execute(sql`DELETE FROM contatos WHERE id_bling = -9999999`);
-    onConflictTest = 'OK — constraint funciona';
+    onConflictTestRaw = 'OK';
   } catch (e: unknown) {
-    onConflictTest = `FALHOU: ${(e as Error).message}`;
+    onConflictTestRaw = `FALHOU: ${(e as Error).message}`;
   }
 
-  return NextResponse.json({ constraints, indexes, migrationsTableExists, onConflictTest });
+  // Teste 2: Drizzle ORM onConflictDoUpdate
+  let onConflictTestDrizzle: string;
+  try {
+    await db.insert(contatos).values({
+      idBling: -9999998,
+      nome: '__FIX_DB_TEST_ORM__',
+      situacaoBling: 'A',
+    }).onConflictDoUpdate({
+      target: contatos.idBling,
+      set: { nome: '__FIX_DB_TEST_ORM_UPDATE__', atualizadoEm: sql`now()` },
+    });
+    await db.execute(sql`DELETE FROM contatos WHERE id_bling = -9999998`);
+    onConflictTestDrizzle = 'OK';
+  } catch (e: unknown) {
+    onConflictTestDrizzle = `FALHOU: ${(e as Error).message}`;
+  }
+
+  return NextResponse.json({ constraints, indexes, migrationsTableExists, onConflictTestRaw, onConflictTestDrizzle });
 }
 
 export async function POST(req: NextRequest) {
