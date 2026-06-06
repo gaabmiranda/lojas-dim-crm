@@ -5,6 +5,7 @@ import { db } from '@/db/client';
 import { cards, colunaCardEnum, pedidos } from '@/db/schema';
 import { auth } from '@/lib/auth';
 import { logEvent } from '@/lib/audit';
+import { addDays } from '@/lib/time';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -69,13 +70,13 @@ export async function PATCH(req: Request, { params }: RouteParams) {
   if (parsed.data.vendedorId !== undefined) updates.vendedorId = parsed.data.vendedorId;
   if (parsed.data.nomeExibido) updates.nomeExibido = parsed.data.nomeExibido;
 
-  const updated = await db
+  const [updated] = await db
     .update(cards)
     .set(updates)
     .where(eq(cards.id, id))
     .returning();
 
-  if (!updated[0]) return new NextResponse('not found', { status: 404 });
+  if (!updated) return new NextResponse('not found', { status: 404 });
 
   await logEvent({
     tipo: 'card_patch',
@@ -84,5 +85,22 @@ export async function PATCH(req: Request, { params }: RouteParams) {
     payload: { changes: parsed.data, by: session.user.id },
   });
 
-  return NextResponse.json(updated[0]);
+  // Quando vendedor move pos_venda → finalizado, agenda reativação D+90 automaticamente.
+  if (parsed.data.coluna === 'finalizado' && updated.tipo === 'pos_venda') {
+    const dpa = addDays(new Date(), 90).toJSDate();
+    try {
+      await db.insert(cards).values({
+        contatoId: updated.contatoId,
+        tipo: 'reativacao',
+        coluna: 'pendente',
+        nomeExibido: `Reativação · ${updated.nomeExibido}`,
+        dataPrevistaAcao: dpa,
+        tentativasReativacao: 0,
+      });
+    } catch {
+      // Partial unique index: já existe card ativo para o contato — noop.
+    }
+  }
+
+  return NextResponse.json(updated);
 }
