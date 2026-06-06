@@ -19,11 +19,12 @@ export async function GET(req: NextRequest) {
     WHERE indexname IN ('contatos_id_bling_unique', 'pedidos_id_bling_unique')
   `);
 
-  const migrations = await db.execute(sql`
-    SELECT id, hash, created_at FROM __drizzle_migrations ORDER BY created_at
+  const migrationsTableExists = await db.execute(sql`
+    SELECT 1 FROM information_schema.tables
+    WHERE table_name = '__drizzle_migrations'
   `);
 
-  return NextResponse.json({ constraints, indexes, migrations });
+  return NextResponse.json({ constraints, indexes, migrationsTableExists });
 }
 
 export async function POST(req: NextRequest) {
