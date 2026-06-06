@@ -39,7 +39,7 @@ export async function logEvent(args: LogEventArgs): Promise<LogEventResult> {
     const inserted = await db
       .insert(eventos)
       .values(row)
-      .onConflictDoNothing({ target: [eventos.origem, eventos.externalId] })
+      .onConflictDoNothing()
       .returning({ id: eventos.id });
 
     if (inserted.length === 0) {
