@@ -76,11 +76,13 @@ export async function POST(req: Request) {
   return NextResponse.json({ ok: true, tipo, processados, aplicados, pulados });
 }
 
+type CardComNome = CardInput & { nomeExibido: string | null };
+
 async function selecionarCandidatos(
   tipo: 'd14' | 'sem_resposta' | 'reativacao' | 'arquivar',
   agora: Date,
   limite48h: Date,
-): Promise<CardInput[]> {
+): Promise<CardComNome[]> {
   const base = {
     where: undefined as ReturnType<typeof and> | undefined,
   };
@@ -120,6 +122,7 @@ async function selecionarCandidatos(
       tentativasReativacao: cards.tentativasReativacao,
       dataPrevistaAcao: cards.dataPrevistaAcao,
       atualizadoEm: cards.atualizadoEm,
+      nomeExibido: cards.nomeExibido,
     })
     .from(cards)
     .where(base.where)
@@ -128,7 +131,7 @@ async function selecionarCandidatos(
   return rows;
 }
 
-async function aplicarTransicao(card: CardInput, t: Transicao): Promise<void> {
+async function aplicarTransicao(card: CardComNome, t: Transicao): Promise<void> {
   await db.transaction(async (tx) => {
     if (t.tipo === 'enviar_mensagem_d14') {
       await tx
@@ -145,7 +148,7 @@ async function aplicarTransicao(card: CardInput, t: Transicao): Promise<void> {
         contatoId: t.criarNovoCard.contatoId,
         tipo: 'reativacao',
         coluna: 'pendente',
-        nomeExibido: `Reativação · contato ${t.criarNovoCard.contatoId}`,
+        nomeExibido: `Reativação · ${card.nomeExibido ?? `contato ${t.criarNovoCard.contatoId}`}`,
         dataPrevistaAcao: t.criarNovoCard.dataPrevistaAcao,
         tentativasReativacao: 0,
       });
