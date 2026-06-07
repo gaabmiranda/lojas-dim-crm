@@ -13,8 +13,11 @@ export async function GET(req: Request) {
   const limit = Math.min(Number(searchParams.get('limit') ?? 50), 200);
   const offset = Math.max(Number(searchParams.get('offset') ?? 0), 0);
 
+  const qDigits = q?.replace(/\D/g, '');
   const where = q
-    ? or(ilike(contatos.nome, `%${q}%`), ilike(contatos.telefone, `%${q.replace(/\D/g, '')}%`))
+    ? qDigits
+      ? or(ilike(contatos.nome, `%${q}%`), ilike(contatos.telefone, `%${qDigits}%`))
+      : ilike(contatos.nome, `%${q}%`)
     : undefined;
 
   const rows = await db
