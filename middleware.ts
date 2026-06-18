@@ -18,6 +18,7 @@ const PUBLIC_PATHS = [
   '/api/cron',
   '/api/health',
   '/api/bootstrap',
+  '/api/import',
   '/_next',
   '/favicon.ico',
 ];

@@ -288,6 +288,303 @@ export const notificacoes = pgTable(
   }),
 );
 
+// ─── Formas de pagamento (lookup Bling) ────────────────────────────────────
+export const formasPagamento = pgTable('formas_pagamento', {
+  id: serial('id').primaryKey(),
+  idBling: bigint('id_bling', { mode: 'number' }).notNull(),
+  descricao: text('descricao').notNull(),
+  tipoPagamento: smallint('tipo_pagamento'),
+  situacao: text('situacao'),
+  padrao: boolean('padrao').default(false),
+  criadoEm: timestamp('criado_em', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
+}, (t) => ({
+  idBlingUnique: uniqueIndex('formas_pagamento_id_bling_unique').on(t.idBling),
+}));
+
+// ─── Categorias receitas/despesas (lookup Bling) ───────────────────────────
+export const categoriasFinanceiras = pgTable('categorias_financeiras', {
+  id: serial('id').primaryKey(),
+  idBling: bigint('id_bling', { mode: 'number' }).notNull(),
+  descricao: text('descricao').notNull(),
+  tipo: text('tipo'), // 'R' | 'D'
+  situacao: text('situacao'),
+  criadoEm: timestamp('criado_em', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
+}, (t) => ({
+  idBlingUnique: uniqueIndex('categorias_financeiras_id_bling_unique').on(t.idBling),
+}));
+
+// ─── Contas a receber ──────────────────────────────────────────────────────
+export const contasReceber = pgTable(
+  'contas_receber',
+  {
+    id: serial('id').primaryKey(),
+    idBling: bigint('id_bling', { mode: 'number' }).notNull(),
+    contatoId: integer('contato_id').references(() => contatos.id),
+    contatoIdBling: bigint('contato_id_bling', { mode: 'number' }),
+    situacao: text('situacao'),
+    vencimento: date('vencimento', { mode: 'date' }),
+    vencimentoOriginal: date('vencimento_original', { mode: 'date' }),
+    valor: numeric('valor', { precision: 14, scale: 2 }),
+    saldo: numeric('saldo', { precision: 14, scale: 2 }),
+    historico: text('historico'),
+    numeroBanco: text('numero_banco'),
+    categoriaIdBling: bigint('categoria_id_bling', { mode: 'number' }),
+    dadosJson: jsonb('dados_json'),
+    criadoEm: timestamp('criado_em', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
+    atualizadoEm: timestamp('atualizado_em', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
+  },
+  (t) => ({
+    idBlingUnique: uniqueIndex('contas_receber_id_bling_unique').on(t.idBling),
+    vencimentoIdx: index('contas_receber_vencimento_idx').on(t.vencimento),
+    situacaoIdx: index('contas_receber_situacao_idx').on(t.situacao),
+    contatoIdx: index('contas_receber_contato_idx').on(t.contatoId),
+  }),
+);
+
+// ─── Contas a pagar ────────────────────────────────────────────────────────
+export const contasPagar = pgTable(
+  'contas_pagar',
+  {
+    id: serial('id').primaryKey(),
+    idBling: bigint('id_bling', { mode: 'number' }).notNull(),
+    fornecedorId: integer('fornecedor_id').references(() => contatos.id),
+    fornecedorIdBling: bigint('fornecedor_id_bling', { mode: 'number' }),
+    situacao: text('situacao'),
+    vencimento: date('vencimento', { mode: 'date' }),
+    vencimentoOriginal: date('vencimento_original', { mode: 'date' }),
+    valor: numeric('valor', { precision: 14, scale: 2 }),
+    saldo: numeric('saldo', { precision: 14, scale: 2 }),
+    historico: text('historico'),
+    numeroBanco: text('numero_banco'),
+    categoriaIdBling: bigint('categoria_id_bling', { mode: 'number' }),
+    dadosJson: jsonb('dados_json'),
+    criadoEm: timestamp('criado_em', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
+    atualizadoEm: timestamp('atualizado_em', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
+  },
+  (t) => ({
+    idBlingUnique: uniqueIndex('contas_pagar_id_bling_unique').on(t.idBling),
+    vencimentoIdx: index('contas_pagar_vencimento_idx').on(t.vencimento),
+    situacaoIdx: index('contas_pagar_situacao_idx').on(t.situacao),
+  }),
+);
+
+// ─── Categorias de produtos (lookup Bling) ─────────────────────────────────
+export const categoriasProdutos = pgTable('categorias_produtos', {
+  id: serial('id').primaryKey(),
+  idBling: bigint('id_bling', { mode: 'number' }).notNull(),
+  descricao: text('descricao').notNull(),
+  criadoEm: timestamp('criado_em', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
+}, (t) => ({
+  idBlingUnique: uniqueIndex('categorias_produtos_id_bling_unique').on(t.idBling),
+}));
+
+// ─── Depósitos (lookup Bling) ──────────────────────────────────────────────
+export const depositos = pgTable('depositos', {
+  id: serial('id').primaryKey(),
+  idBling: bigint('id_bling', { mode: 'number' }).notNull(),
+  descricao: text('descricao').notNull(),
+  situacao: text('situacao'),
+  padrao: boolean('padrao').default(false),
+  criadoEm: timestamp('criado_em', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
+}, (t) => ({
+  idBlingUnique: uniqueIndex('depositos_id_bling_unique').on(t.idBling),
+}));
+
+// ─── Produtos ──────────────────────────────────────────────────────────────
+export const produtos = pgTable(
+  'produtos',
+  {
+    id: serial('id').primaryKey(),
+    idBling: bigint('id_bling', { mode: 'number' }).notNull(),
+    nome: text('nome').notNull(),
+    codigo: text('codigo'),
+    tipo: text('tipo'), // 'P' | 'S' | 'K'
+    situacao: text('situacao'),
+    preco: numeric('preco', { precision: 14, scale: 2 }),
+    precoCusto: numeric('preco_custo', { precision: 14, scale: 2 }),
+    unidade: text('unidade'),
+    categoriaIdBling: bigint('categoria_id_bling', { mode: 'number' }),
+    dadosJson: jsonb('dados_json'),
+    criadoEm: timestamp('criado_em', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
+    atualizadoEm: timestamp('atualizado_em', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
+  },
+  (t) => ({
+    idBlingUnique: uniqueIndex('produtos_id_bling_unique').on(t.idBling),
+    nomeIdx: index('produtos_nome_idx').on(t.nome),
+    codigoIdx: index('produtos_codigo_idx').on(t.codigo),
+  }),
+);
+
+// ─── Produto variações ─────────────────────────────────────────────────────
+export const produtoVariacoes = pgTable(
+  'produto_variacoes',
+  {
+    id: serial('id').primaryKey(),
+    idBling: bigint('id_bling', { mode: 'number' }).notNull(),
+    produtoId: integer('produto_id').references(() => produtos.id, { onDelete: 'cascade' }),
+    produtoIdBling: bigint('produto_id_bling', { mode: 'number' }).notNull(),
+    nome: text('nome'),
+    codigo: text('codigo'),
+    preco: numeric('preco', { precision: 14, scale: 2 }),
+    criadoEm: timestamp('criado_em', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
+  },
+  (t) => ({
+    idBlingUnique: uniqueIndex('produto_variacoes_id_bling_unique').on(t.idBling),
+    produtoIdx: index('produto_variacoes_produto_idx').on(t.produtoId),
+  }),
+);
+
+// ─── Estoques (saldo atual por depósito) ───────────────────────────────────
+export const estoques = pgTable(
+  'estoques',
+  {
+    id: serial('id').primaryKey(),
+    produtoId: integer('produto_id').references(() => produtos.id, { onDelete: 'cascade' }),
+    produtoIdBling: bigint('produto_id_bling', { mode: 'number' }).notNull(),
+    depositoIdBling: bigint('deposito_id_bling', { mode: 'number' }),
+    depositoNome: text('deposito_nome'),
+    saldoVirtual: numeric('saldo_virtual', { precision: 14, scale: 4 }),
+    saldoFisico: numeric('saldo_fisico', { precision: 14, scale: 4 }),
+    atualizadoEm: timestamp('atualizado_em', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
+  },
+  (t) => ({
+    produtoDepositoUnique: uniqueIndex('estoques_produto_deposito_unique').on(t.produtoIdBling, t.depositoIdBling),
+    produtoIdx: index('estoques_produto_idx').on(t.produtoId),
+  }),
+);
+
+// ─── Pedidos de compra ─────────────────────────────────────────────────────
+export const pedidosCompra = pgTable(
+  'pedidos_compra',
+  {
+    id: serial('id').primaryKey(),
+    idBling: bigint('id_bling', { mode: 'number' }).notNull(),
+    fornecedorId: integer('fornecedor_id').references(() => contatos.id),
+    fornecedorIdBling: bigint('fornecedor_id_bling', { mode: 'number' }),
+    numero: text('numero'),
+    data: date('data', { mode: 'date' }),
+    situacaoValor: smallint('situacao_valor'),
+    total: numeric('total', { precision: 14, scale: 2 }),
+    dadosJson: jsonb('dados_json'),
+    criadoEm: timestamp('criado_em', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
+    atualizadoEm: timestamp('atualizado_em', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
+  },
+  (t) => ({
+    idBlingUnique: uniqueIndex('pedidos_compra_id_bling_unique').on(t.idBling),
+    dataIdx: index('pedidos_compra_data_idx').on(t.data.desc()),
+  }),
+);
+
+export const pedidosCompraItens = pgTable('pedidos_compra_itens', {
+  id: serial('id').primaryKey(),
+  pedidoCompraId: integer('pedido_compra_id').notNull().references(() => pedidosCompra.id, { onDelete: 'cascade' }),
+  produtoIdBling: bigint('produto_id_bling', { mode: 'number' }),
+  descricao: text('descricao').notNull(),
+  quantidade: numeric('quantidade', { precision: 14, scale: 4 }),
+  valorUnitario: numeric('valor_unitario', { precision: 14, scale: 2 }),
+  valorTotal: numeric('valor_total', { precision: 14, scale: 2 }),
+});
+
+// ─── Naturezas de operação (lookup Bling) ──────────────────────────────────
+export const naturezasOperacao = pgTable('naturezas_operacao', {
+  id: serial('id').primaryKey(),
+  idBling: bigint('id_bling', { mode: 'number' }).notNull(),
+  descricao: text('descricao').notNull(),
+  tipo: text('tipo'),
+  criadoEm: timestamp('criado_em', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
+}, (t) => ({
+  idBlingUnique: uniqueIndex('naturezas_operacao_id_bling_unique').on(t.idBling),
+}));
+
+// ─── NF-e ─────────────────────────────────────────────────────────────────
+export const nfe = pgTable(
+  'nfe',
+  {
+    id: serial('id').primaryKey(),
+    idBling: bigint('id_bling', { mode: 'number' }).notNull(),
+    numero: text('numero'),
+    serie: text('serie'),
+    situacao: smallint('situacao'),
+    dataEmissao: date('data_emissao', { mode: 'date' }),
+    contatoIdBling: bigint('contato_id_bling', { mode: 'number' }),
+    contatoId: integer('contato_id').references(() => contatos.id),
+    valorTotal: numeric('valor_total', { precision: 14, scale: 2 }),
+    chave: text('chave'),
+    dadosJson: jsonb('dados_json'),
+    criadoEm: timestamp('criado_em', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
+  },
+  (t) => ({
+    idBlingUnique: uniqueIndex('nfe_id_bling_unique').on(t.idBling),
+    dataEmissaoIdx: index('nfe_data_emissao_idx').on(t.dataEmissao.desc()),
+    situacaoIdx: index('nfe_situacao_idx').on(t.situacao),
+  }),
+);
+
+// ─── NFC-e ────────────────────────────────────────────────────────────────
+export const nfce = pgTable(
+  'nfce',
+  {
+    id: serial('id').primaryKey(),
+    idBling: bigint('id_bling', { mode: 'number' }).notNull(),
+    numero: text('numero'),
+    serie: text('serie'),
+    situacao: smallint('situacao'),
+    dataEmissao: date('data_emissao', { mode: 'date' }),
+    valorTotal: numeric('valor_total', { precision: 14, scale: 2 }),
+    chave: text('chave'),
+    dadosJson: jsonb('dados_json'),
+    criadoEm: timestamp('criado_em', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
+  },
+  (t) => ({
+    idBlingUnique: uniqueIndex('nfce_id_bling_unique').on(t.idBling),
+    dataEmissaoIdx: index('nfce_data_emissao_idx').on(t.dataEmissao.desc()),
+  }),
+);
+
+// ─── Logísticas (lookup Bling) ─────────────────────────────────────────────
+export const logisticas = pgTable('logisticas', {
+  id: serial('id').primaryKey(),
+  idBling: bigint('id_bling', { mode: 'number' }).notNull(),
+  nome: text('nome').notNull(),
+  tipo: text('tipo'),
+  situacao: text('situacao'),
+  criadoEm: timestamp('criado_em', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
+}, (t) => ({
+  idBlingUnique: uniqueIndex('logisticas_id_bling_unique').on(t.idBling),
+}));
+
+// ─── Logísticas remessas ───────────────────────────────────────────────────
+export const logisticasRemessas = pgTable(
+  'logisticas_remessas',
+  {
+    id: serial('id').primaryKey(),
+    idBling: bigint('id_bling', { mode: 'number' }).notNull(),
+    situacao: text('situacao'),
+    codigoRastreio: text('codigo_rastreio'),
+    pedidoIdBling: bigint('pedido_id_bling', { mode: 'number' }),
+    pedidoId: integer('pedido_id').references(() => pedidos.id),
+    logisticaIdBling: bigint('logistica_id_bling', { mode: 'number' }),
+    dadosJson: jsonb('dados_json'),
+    criadoEm: timestamp('criado_em', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
+  },
+  (t) => ({
+    idBlingUnique: uniqueIndex('logisticas_remessas_id_bling_unique').on(t.idBling),
+    pedidoIdx: index('logisticas_remessas_pedido_idx').on(t.pedidoId),
+  }),
+);
+
+// ─── Vendedores Bling (lookup) ─────────────────────────────────────────────
+export const vendedoresBling = pgTable('vendedores_bling', {
+  id: serial('id').primaryKey(),
+  idBling: bigint('id_bling', { mode: 'number' }).notNull(),
+  contatoIdBling: bigint('contato_id_bling', { mode: 'number' }),
+  contatoNome: text('contato_nome'),
+  comissao: numeric('comissao', { precision: 5, scale: 2 }),
+  criadoEm: timestamp('criado_em', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
+}, (t) => ({
+  idBlingUnique: uniqueIndex('vendedores_bling_id_bling_unique').on(t.idBling),
+}));
+
 // ─── Type exports ──────────────────────────────────────────────────────────
 export type Contato = typeof contatos.$inferSelect;
 export type NewContato = typeof contatos.$inferInsert;
