@@ -24,9 +24,9 @@ export async function POST(req: Request) {
   }
 
   if (tipo === 'status') {
-    const [{ nc }] = await db.execute<{ nc: number }>(drizzleSql`SELECT count(*)::int AS nc FROM contatos`);
-    const [{ np }] = await db.execute<{ np: number }>(drizzleSql`SELECT count(*)::int AS np FROM pedidos`);
-    const [{ ni }] = await db.execute<{ ni: number }>(drizzleSql`SELECT count(*)::int AS ni FROM pedido_itens`);
+    const nc = (await db.execute<{ nc: number }>(drizzleSql`SELECT count(*)::int AS nc FROM contatos`))[0]?.nc ?? 0;
+    const np = (await db.execute<{ np: number }>(drizzleSql`SELECT count(*)::int AS np FROM pedidos`))[0]?.np ?? 0;
+    const ni = (await db.execute<{ ni: number }>(drizzleSql`SELECT count(*)::int AS ni FROM pedido_itens`))[0]?.ni ?? 0;
     return NextResponse.json({ contatos: nc, pedidos: np, pedido_itens: ni });
   }
 
