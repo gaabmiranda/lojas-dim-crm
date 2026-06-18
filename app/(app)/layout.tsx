@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { auth, signOut } from '@/lib/auth';
-import { Bell, KanbanSquare, Settings, Users } from 'lucide-react';
+import { Bell, KanbanSquare, LayoutDashboard, Settings, Users } from 'lucide-react';
 import { NotificacoesBadge } from './_components/NotificacoesBadge';
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -20,6 +20,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         </div>
         <nav className="p-2 space-y-1">
           <NavItem href="/kanban" icon={<KanbanSquare className="h-4 w-4" />} label="Kanban" />
+          <NavItem
+            href="/dashboard"
+            icon={<LayoutDashboard className="h-4 w-4" />}
+            label="Dashboard"
+          />
           <NavItem href="/contatos" icon={<Users className="h-4 w-4" />} label="Contatos" />
           <NavItem
             href="/notificacoes"
