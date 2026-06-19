@@ -47,6 +47,7 @@ const patchSchema = z.object({
   coluna: z.enum(colunaCardEnum.enumValues).optional(),
   vendedorId: z.number().int().nullable().optional(),
   nomeExibido: z.string().min(1).optional(),
+  dataPrevistaAcao: z.string().datetime({ offset: true }).nullable().optional(),
 });
 
 export async function PATCH(req: Request, { params }: RouteParams) {
@@ -72,6 +73,9 @@ export async function PATCH(req: Request, { params }: RouteParams) {
   }
   if (parsed.data.vendedorId !== undefined) updates.vendedorId = parsed.data.vendedorId;
   if (parsed.data.nomeExibido) updates.nomeExibido = parsed.data.nomeExibido;
+  if (parsed.data.dataPrevistaAcao !== undefined) {
+    updates.dataPrevistaAcao = parsed.data.dataPrevistaAcao ? new Date(parsed.data.dataPrevistaAcao) : null;
+  }
 
   const [updated] = await db
     .update(cards)
