@@ -57,9 +57,10 @@ export async function POST(req: Request) {
       const blingPedido = await getPedido(idBling);
 
       // Sempre atualiza dadosCompletosJson com a resposta completa (marca como verificado).
+      // JSON.stringify necessário: drizzleSql raw não serializa objetos JS para jsonb automaticamente.
       await db.execute(drizzleSql`
         UPDATE pedidos
-        SET dados_completos_json = ${blingPedido as unknown as Record<string, unknown>}::jsonb,
+        SET dados_completos_json = ${JSON.stringify(blingPedido)}::jsonb,
             atualizado_em = now()
         WHERE id = ${Number(row.id)}
       `);
