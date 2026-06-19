@@ -35,7 +35,7 @@ import {
   vendedoresBling,
   contatos,
 } from '@/db/schema';
-import { blingFetch } from '@/lib/bling/client';
+import { blingFetch, BlingApiError } from '@/lib/bling/client';
 import { verifyN8nSecret } from '@/lib/n8n/trigger';
 import type {
   BlingFormaPagamento,
@@ -104,8 +104,15 @@ function toDate(s: string | null | undefined): Date | null {
 
 async function fetchPage<T>(path: string, pagina: number, limite = 100): Promise<{ data: T[]; hasMore: boolean }> {
   const qs = `?pagina=${pagina}&limite=${limite}`;
-  const resp = await blingFetch<{ data: T[] }>(`${path}${qs}`);
-  return { data: resp.data ?? [], hasMore: (resp.data?.length ?? 0) >= limite };
+  try {
+    const resp = await blingFetch<{ data: T[] }>(`${path}${qs}`);
+    return { data: resp.data ?? [], hasMore: (resp.data?.length ?? 0) >= limite };
+  } catch (e) {
+    if (e instanceof BlingApiError && (e.status === 404 || e.status === 403)) {
+      return { data: [], hasMore: false };
+    }
+    throw e;
+  }
 }
 
 // ─── Handlers ────────────────────────────────────────────────────────────────
@@ -114,7 +121,7 @@ const handlers: Record<Module, (pagina: number) => Promise<HandlerResult>> = {
 
   // ── formasPagamento ────────────────────────────────────────────────────────
   async formasPagamento(pagina) {
-    const { data, hasMore } = await fetchPage<BlingFormaPagamento>('/formas-de-pagamento', pagina);
+    const { data, hasMore } = await fetchPage<BlingFormaPagamento>('/formasDePagamento', pagina);
     if (data.length) {
       await db.insert(formasPagamento).values(
         data.map(r => ({
