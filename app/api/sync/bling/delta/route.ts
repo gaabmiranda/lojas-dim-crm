@@ -128,7 +128,7 @@ async function upsertPedidoBling(blingPedido: import('@/lib/bling/types').BlingP
           atualizadoEm: drizzleSql`now()`,
         },
       })
-      .returning({ id: pedidos.id, situacaoValor: pedidos.situacaoValor });
+      .returning({ id: pedidos.id, situacaoId: pedidos.situacaoId });
     const pedidoLocal = insertedPedido[0]!;
 
     if (itens.length > 0) {
@@ -136,7 +136,7 @@ async function upsertPedidoBling(blingPedido: import('@/lib/bling/types').BlingP
       await tx.insert(pedidoItens).values(itens.map((i) => ({ ...i, pedidoId: pedidoLocal.id })));
     }
 
-    if (pedidoLocal.situacaoValor !== SITUACAO_VALOR.ATENDIDO) {
+    if (pedidoLocal.situacaoId !== SITUACAO_VALOR.ATENDIDO) {
       return { cardCriado: false };
     }
 

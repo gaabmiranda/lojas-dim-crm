@@ -120,7 +120,7 @@ async function processarPedidoBling(pedidoIdBling: number): Promise<void> {
           atualizadoEm: drizzleSql`now()`,
         },
       })
-      .returning({ id: pedidos.id, situacaoValor: pedidos.situacaoValor });
+      .returning({ id: pedidos.id, situacaoId: pedidos.situacaoId });
     const pedidoLocal = insertedPedido[0]!;
 
     if (itens.length > 0) {
@@ -129,7 +129,7 @@ async function processarPedidoBling(pedidoIdBling: number): Promise<void> {
     }
 
     // Só cria card se o pedido está ATENDIDO (regra de negócio AC1).
-    if (pedidoLocal.situacaoValor === SITUACAO_VALOR.ATENDIDO) {
+    if (pedidoLocal.situacaoId === SITUACAO_VALOR.ATENDIDO) {
       // Freezing: ignora criação de card se contato está congelado.
       if (
         contatoLocal.freezingAte &&
