@@ -584,6 +584,7 @@ export const vendedoresBling = pgTable('vendedores_bling', {
   contatoIdBling: bigint('contato_id_bling', { mode: 'number' }),
   contatoNome: text('contato_nome'),
   comissao: numeric('comissao', { precision: 5, scale: 2 }),
+  usuarioId: integer('usuario_id').references(() => usuarios.id),
   criadoEm: timestamp('criado_em', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
 }, (t) => ({
   idBlingUnique: uniqueIndex('vendedores_bling_id_bling_unique').on(t.idBling),

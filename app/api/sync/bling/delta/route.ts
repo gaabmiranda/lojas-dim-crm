@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { sql as drizzleSql, eq } from 'drizzle-orm';
 import { db } from '@/db/client';
-import { cards, contatos, pedidoItens, pedidos } from '@/db/schema';
+import { cards, contatos, pedidoItens, pedidos, vendedoresBling } from '@/db/schema';
 import { logEvent } from '@/lib/audit';
 import { getFlag, setFlag } from '@/lib/feature-flags';
 import { listPedidos } from '@/lib/bling/client';
@@ -176,6 +176,24 @@ async function upsertPedidoBling(blingPedido: import('@/lib/bling/types').BlingP
         : null,
     );
 
+    // Resolve vendedor: upsert no lookup e busca o usuarioId mapeado
+    let vendedorId: number | null = null;
+    if (blingPedido.vendedor?.id) {
+      await tx.insert(vendedoresBling).values({
+        idBling: blingPedido.vendedor.id,
+        contatoIdBling: blingPedido.vendedor.contato?.id ?? null,
+        contatoNome: blingPedido.vendedor.contato?.nome ?? null,
+      }).onConflictDoUpdate({
+        target: vendedoresBling.idBling,
+        set: { contatoNome: drizzleSql`excluded.contato_nome` },
+      });
+      const vb = await tx.select({ usuarioId: vendedoresBling.usuarioId })
+        .from(vendedoresBling)
+        .where(eq(vendedoresBling.idBling, blingPedido.vendedor.id))
+        .limit(1);
+      vendedorId = vb[0]?.usuarioId ?? null;
+    }
+
     if (transicao.cancelarCardId) {
       await tx
         .update(cards)
@@ -191,6 +209,7 @@ async function upsertPedidoBling(blingPedido: import('@/lib/bling/types').BlingP
       nomeExibido: blingPedido.contato.nome ?? `Cliente #${contatoLocal.id}`,
       dataPrevistaAcao: transicao.criarNovoCard.dataPrevistaAcao,
       tentativasReativacao: 0,
+      vendedorId,
     });
 
     return { cardCriado: true };

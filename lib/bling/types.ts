@@ -55,6 +55,11 @@ export interface BlingPedidoVenda {
     tipoPessoa?: string;
     numeroDocumento?: string;
   };
+  vendedor?: {
+    id: number;
+    contato?: { id?: number; nome?: string };
+    comissao?: number;
+  };
   itens?: BlingPedidoItem[];
 }
 

@@ -8,7 +8,7 @@ import {
   closestCorners,
   type DragEndEvent,
 } from '@dnd-kit/core';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import type { ColunaCard, TipoCard } from '@/db/schema';
@@ -44,6 +44,11 @@ interface Vendedor {
   nome: string | null;
 }
 
+const COLUNA_LABELS: Record<string, string> = {
+  pendente: 'Pendente',
+  em_contato: 'Em Contato',
+};
+
 export function KanbanBoard({
   colunas: initialColunas,
   vendedores,
@@ -55,8 +60,18 @@ export function KanbanBoard({
 }) {
   const [colunas, setColunas] = useState(initialColunas);
   const [localFiltros, setLocalFiltros] = useState<Filtros>(filtros);
+
+  // Modo seleção em massa
+  const [modoSelecao, setModoSelecao] = useState(false);
+  const [selecionados, setSelecionados] = useState<Set<number>>(new Set());
+  const [bulkColuna, setBulkColuna] = useState('');
+  const [bulkVendedor, setBulkVendedor] = useState('');
+  const [pendingBulk, startBulkTransition] = useTransition();
+
   const router = useRouter();
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { delay: 150, tolerance: 8 } }),
+  );
 
   const cardsById = useMemo(() => {
     const map = new Map<number, KanbanCardData>();
@@ -73,6 +88,61 @@ export function KanbanBoard({
     router.replace(`/kanban?${params.toString()}`);
   }
 
+  function toggleCard(id: number) {
+    setSelecionados((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function entrarSelecao() {
+    setModoSelecao(true);
+    setSelecionados(new Set());
+    setBulkColuna('');
+    setBulkVendedor('');
+  }
+
+  function sairSelecao() {
+    setModoSelecao(false);
+    setSelecionados(new Set());
+    setBulkColuna('');
+    setBulkVendedor('');
+  }
+
+  function selecionarTodos() {
+    const todos = new Set<number>();
+    for (const col of colunas) for (const card of col.items) todos.add(card.id);
+    setSelecionados(todos);
+  }
+
+  async function aplicarBulk() {
+    if (!bulkColuna && !bulkVendedor) {
+      toast.error('Selecione uma etapa ou vendedor para aplicar.');
+      return;
+    }
+    const body: Record<string, unknown> = { ids: Array.from(selecionados) };
+    if (bulkColuna) body.coluna = bulkColuna;
+    if (bulkVendedor) body.vendedorId = bulkVendedor === 'null' ? null : Number(bulkVendedor);
+
+    startBulkTransition(async () => {
+      const resp = await fetch('/api/cards/bulk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (!resp.ok) {
+        toast.error('Falha na edição em massa.');
+        return;
+      }
+      const result = await resp.json() as { updated: number };
+      toast.success(`${result.updated} card(s) atualizados.`);
+      sairSelecao();
+      router.refresh();
+    });
+  }
+
   async function onDragEnd(e: DragEndEvent) {
     const cardId = Number(e.active.id);
     const dest = e.over?.id ? String(e.over.id) : null;
@@ -81,12 +151,9 @@ export function KanbanBoard({
     const card = cardsById.get(cardId);
     if (!card || card.coluna === novaColuna) return;
 
-    // optimistic update
     setColunas((prev) => {
       const next = prev.map((c) => ({ ...c, items: [...c.items] }));
-      for (const col of next) {
-        col.items = col.items.filter((i) => i.id !== cardId);
-      }
+      for (const col of next) col.items = col.items.filter((i) => i.id !== cardId);
       const target = next.find((c) => c.id === novaColuna);
       if (target) target.items.unshift({ ...card, coluna: novaColuna });
       return next;
@@ -99,7 +166,7 @@ export function KanbanBoard({
         body: JSON.stringify({ coluna: novaColuna }),
       });
       if (!resp.ok) throw new Error('PATCH falhou');
-      toast.success(`Movido pra ${novaColuna}`);
+      toast.success(`Movido para ${novaColuna}`);
       router.refresh();
     } catch (err) {
       console.error(err);
@@ -109,66 +176,142 @@ export function KanbanBoard({
   }
 
   const filtroAtivo = localFiltros.vendedorId !== null || localFiltros.tipo !== null;
+  const totalCards = colunas.reduce((a, c) => a + c.items.length, 0);
 
   return (
     <div>
-      {/* Barra de filtros */}
+      {/* Barra de filtros + controles */}
       <div className="flex flex-wrap items-center gap-4 mb-4 p-3 rounded-lg bg-muted/30 border">
-        <div className="flex items-center gap-2">
-          <label htmlFor="filtro-vendedor" className="text-sm font-medium whitespace-nowrap">
-            Vendedor
-          </label>
-          <select
-            id="filtro-vendedor"
-            value={localFiltros.vendedorId ?? ''}
-            onChange={(e) =>
-              aplicarFiltro({ vendedorId: e.target.value ? Number(e.target.value) : null })
-            }
-            className="text-sm border rounded-md px-2 py-1 bg-background min-w-[140px]"
-          >
-            <option value="">Todos</option>
-            {vendedores.map((v) => (
-              <option key={v.id} value={v.id}>
-                {v.nome ?? `#${v.id}`}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium">Tipo</span>
-          <div className="flex gap-1">
-            {([null, 'pos_venda', 'reativacao'] as const).map((t) => (
-              <button
-                key={t ?? 'todos'}
-                onClick={() => aplicarFiltro({ tipo: t })}
-                className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
-                  localFiltros.tipo === t
-                    ? 'bg-foreground text-background border-foreground'
-                    : 'bg-background text-foreground border-border hover:bg-muted'
-                }`}
+        {!modoSelecao ? (
+          <>
+            <div className="flex items-center gap-2">
+              <label htmlFor="filtro-vendedor" className="text-sm font-medium whitespace-nowrap">
+                Vendedor
+              </label>
+              <select
+                id="filtro-vendedor"
+                value={localFiltros.vendedorId ?? ''}
+                onChange={(e) =>
+                  aplicarFiltro({ vendedorId: e.target.value ? Number(e.target.value) : null })
+                }
+                className="text-sm border rounded-md px-2 py-1 bg-background min-w-[140px]"
               >
-                {t === null ? 'Todos' : t === 'pos_venda' ? 'Pós-venda' : 'Reativação'}
-              </button>
-            ))}
-          </div>
-        </div>
+                <option value="">Todos</option>
+                {vendedores.map((v) => (
+                  <option key={v.id} value={v.id}>
+                    {v.nome ?? `#${v.id}`}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-        {filtroAtivo && (
-          <button
-            onClick={() => aplicarFiltro({ vendedorId: null, tipo: null })}
-            className="text-xs text-muted-foreground hover:text-foreground underline ml-auto"
-          >
-            Limpar filtros
-          </button>
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium">Tipo</span>
+              <div className="flex gap-1">
+                {([null, 'pos_venda', 'reativacao'] as const).map((t) => (
+                  <button
+                    key={t ?? 'todos'}
+                    onClick={() => aplicarFiltro({ tipo: t })}
+                    className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
+                      localFiltros.tipo === t
+                        ? 'bg-foreground text-background border-foreground'
+                        : 'bg-background text-foreground border-border hover:bg-muted'
+                    }`}
+                  >
+                    {t === null ? 'Todos' : t === 'pos_venda' ? 'Pós-venda' : 'Reativação'}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {filtroAtivo && (
+              <button
+                onClick={() => aplicarFiltro({ vendedorId: null, tipo: null })}
+                className="text-xs text-muted-foreground hover:text-foreground underline"
+              >
+                Limpar filtros
+              </button>
+            )}
+
+            <button
+              onClick={entrarSelecao}
+              className="ml-auto text-xs border px-3 py-1.5 rounded-md hover:bg-muted transition-colors"
+            >
+              Selecionar em massa
+            </button>
+          </>
+        ) : (
+          <>
+            <span className="text-sm font-medium">
+              {selecionados.size} de {totalCards} selecionados
+            </span>
+            <button
+              onClick={selecionarTodos}
+              className="text-xs text-muted-foreground hover:text-foreground underline"
+            >
+              Selecionar todos
+            </button>
+            <button
+              onClick={() => setSelecionados(new Set())}
+              className="text-xs text-muted-foreground hover:text-foreground underline"
+            >
+              Desmarcar
+            </button>
+            <div className="flex items-center gap-2 ml-auto">
+              <select
+                value={bulkColuna}
+                onChange={(e) => setBulkColuna(e.target.value)}
+                className="text-sm border rounded-md px-2 py-1 bg-background"
+              >
+                <option value="">Mover para etapa…</option>
+                {Object.entries(COLUNA_LABELS).map(([v, l]) => (
+                  <option key={v} value={v}>{l}</option>
+                ))}
+              </select>
+              <select
+                value={bulkVendedor}
+                onChange={(e) => setBulkVendedor(e.target.value)}
+                className="text-sm border rounded-md px-2 py-1 bg-background"
+              >
+                <option value="">Atribuir vendedor…</option>
+                <option value="null">Sem vendedor</option>
+                {vendedores.map((v) => (
+                  <option key={v.id} value={v.id}>{v.nome ?? `#${v.id}`}</option>
+                ))}
+              </select>
+              <button
+                onClick={aplicarBulk}
+                disabled={pendingBulk || selecionados.size === 0}
+                className="text-xs bg-primary text-primary-foreground px-3 py-1.5 rounded-md hover:opacity-90 disabled:opacity-50 transition-opacity"
+              >
+                {pendingBulk ? 'Aplicando…' : 'Aplicar'}
+              </button>
+              <button
+                onClick={sairSelecao}
+                className="text-xs border px-3 py-1.5 rounded-md hover:bg-muted transition-colors"
+              >
+                Cancelar
+              </button>
+            </div>
+          </>
         )}
       </div>
 
       {/* Colunas Kanban */}
-      <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={onDragEnd}>
+      <DndContext
+        sensors={modoSelecao ? [] : sensors}
+        collisionDetection={closestCorners}
+        onDragEnd={onDragEnd}
+      >
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {colunas.map((col) => (
-            <Coluna key={col.id} coluna={col} />
+            <Coluna
+              key={col.id}
+              coluna={col}
+              modoSelecao={modoSelecao}
+              selecionados={selecionados}
+              onToggle={toggleCard}
+            />
           ))}
         </div>
       </DndContext>
@@ -176,7 +319,17 @@ export function KanbanBoard({
   );
 }
 
-function Coluna({ coluna }: { coluna: KanbanColuna }) {
+function Coluna({
+  coluna,
+  modoSelecao,
+  selecionados,
+  onToggle,
+}: {
+  coluna: KanbanColuna;
+  modoSelecao: boolean;
+  selecionados: Set<number>;
+  onToggle: (id: number) => void;
+}) {
   return (
     <section
       id={coluna.id}
@@ -189,7 +342,13 @@ function Coluna({ coluna }: { coluna: KanbanColuna }) {
       </header>
       <div className="space-y-2">
         {coluna.items.map((card) => (
-          <CardItem key={card.id} card={card} />
+          <CardItem
+            key={card.id}
+            card={card}
+            modoSelecao={modoSelecao}
+            selecionado={selecionados.has(card.id)}
+            onToggle={onToggle}
+          />
         ))}
         {coluna.items.length === 0 && (
           <p className="text-xs text-muted-foreground text-center py-8">vazio</p>

@@ -55,6 +55,9 @@ interface CardData {
   nomeExibido: string;
   tipo: string;
   coluna: string;
+  dataPrevistaAcao: Date | null;
+  colunaDeSde: Date;
+  tentativasReativacao: number;
   contato: Contato;
   pedidoOrigem: PedidoOrigem | null;
   atividades: Atividade[];
@@ -84,6 +87,97 @@ function formatDate(d: Date | string | null) {
   return new Date(d).toLocaleDateString('pt-BR');
 }
 
+const COLUNAS_ORDER = ['pendente', 'em_contato', 'finalizado'] as const;
+const COLUNA_LABELS: Record<string, string> = {
+  pendente: 'Pendente',
+  em_contato: 'Em Contato',
+  finalizado: 'Finalizado',
+  arquivo: 'Arquivado',
+};
+
+function EtapaStepper({ card }: { card: Pick<CardData, 'id' | 'coluna' | 'tipo'> }) {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+
+  const idx = COLUNAS_ORDER.indexOf(card.coluna as (typeof COLUNAS_ORDER)[number]);
+  const prevColuna = idx > 0 ? COLUNAS_ORDER[idx - 1] : null;
+  const nextColuna = idx < COLUNAS_ORDER.length - 1 ? COLUNAS_ORDER[idx + 1] : null;
+
+  async function moverPara(coluna: string) {
+    startTransition(async () => {
+      const resp = await fetch(`/api/cards/${card.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ coluna }),
+      });
+      if (!resp.ok) {
+        toast.error('Falha ao mover card.');
+        return;
+      }
+      toast.success(`Movido para ${COLUNA_LABELS[coluna]}.`);
+      router.refresh();
+    });
+  }
+
+  if (card.coluna === 'arquivo') {
+    return (
+      <span className="inline-block text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded">
+        Arquivado
+      </span>
+    );
+  }
+
+  return (
+    <div className="flex flex-wrap items-center gap-3">
+      {/* Pipeline visual */}
+      <div className="flex items-center gap-1">
+        {COLUNAS_ORDER.map((c, i) => (
+          <span key={c} className="flex items-center gap-1">
+            <span
+              className={`text-xs px-2 py-0.5 rounded ${
+                c === card.coluna
+                  ? 'bg-primary text-primary-foreground font-medium'
+                  : i < idx
+                  ? 'text-muted-foreground line-through'
+                  : 'text-muted-foreground'
+              }`}
+            >
+              {COLUNA_LABELS[c]}
+            </span>
+            {i < COLUNAS_ORDER.length - 1 && (
+              <span className="text-muted-foreground text-xs">→</span>
+            )}
+          </span>
+        ))}
+      </div>
+
+      {/* Botões */}
+      <div className="flex gap-2 ml-auto">
+        {prevColuna && (
+          <button
+            onClick={() => moverPara(prevColuna)}
+            disabled={pending}
+            className="text-xs border px-3 py-1 rounded-md hover:bg-muted disabled:opacity-50 transition-colors"
+          >
+            ← {COLUNA_LABELS[prevColuna]}
+          </button>
+        )}
+        {nextColuna && (
+          <button
+            onClick={() => moverPara(nextColuna)}
+            disabled={pending}
+            className="text-xs bg-primary text-primary-foreground px-3 py-1 rounded-md hover:opacity-90 disabled:opacity-50 transition-opacity"
+          >
+            {card.tipo === 'pos_venda' && nextColuna === 'finalizado'
+              ? 'Finalizar (arquiva) →'
+              : `${COLUNA_LABELS[nextColuna]} →`}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function Header({ card }: { card: CardData }) {
   const [pending, startTransition] = useTransition();
 
@@ -102,6 +196,19 @@ function Header({ card }: { card: CardData }) {
       }
     });
   }
+
+  const diasNaEtapa = Math.floor(
+    (Date.now() - new Date(card.colunaDeSde).getTime()) / 86_400_000,
+  );
+
+  const tipoLabel =
+    card.tipo === 'pos_venda'
+      ? 'Pós-venda'
+      : `Reativação ${card.tentativasReativacao}/3`;
+  const tipoColor =
+    card.tipo === 'pos_venda'
+      ? 'bg-blue-50 text-blue-700 border-blue-200'
+      : 'bg-amber-50 text-amber-700 border-amber-200';
 
   return (
     <section className="border rounded-lg p-4 bg-card">
@@ -124,9 +231,26 @@ function Header({ card }: { card: CardData }) {
           {pending ? 'Abrindo…' : 'Abrir WhatsApp'}
         </button>
       </div>
-      <p className="text-xs text-muted-foreground mt-3">
-        Tipo: <strong>{card.tipo}</strong> · Coluna: <strong>{card.coluna}</strong>
-      </p>
+
+      <div className="mt-3 space-y-2">
+        {/* Tipo + info contextual */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className={`text-xs px-2 py-0.5 rounded border ${tipoColor}`}>
+            {tipoLabel}
+          </span>
+          <span className="text-xs text-muted-foreground">
+            {diasNaEtapa === 0 ? 'Hoje' : diasNaEtapa === 1 ? '1 dia' : `${diasNaEtapa} dias`} nesta etapa
+          </span>
+          {card.dataPrevistaAcao && (
+            <span className="text-xs text-muted-foreground">
+              · Ação prevista: {formatDate(card.dataPrevistaAcao)}
+            </span>
+          )}
+        </div>
+
+        {/* Pipeline stepper */}
+        <EtapaStepper card={card} />
+      </div>
     </section>
   );
 }

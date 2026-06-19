@@ -36,6 +36,13 @@
       "when": 1781830000000,
       "tag": "0004_kanban_coluna_desde",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1781910000000,
+      "tag": "0005_vendedores_usuario_id",
+      "breakpoints": true
     }
   ]
 }

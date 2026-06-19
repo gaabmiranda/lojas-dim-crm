@@ -1,7 +1,7 @@
 'use client';
 
 import { useDraggable } from '@dnd-kit/core';
-import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import type { KanbanCardData } from './KanbanBoard';
 
 function formatCurrency(valor: string | null): string {
@@ -11,24 +11,18 @@ function formatCurrency(valor: string | null): string {
   return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
-function formatDate(iso: string | null): string {
-  if (!iso) return '';
-  const d = new Date(iso);
-  return d.toLocaleDateString('pt-BR');
+interface CardItemProps {
+  card: KanbanCardData;
+  modoSelecao?: boolean;
+  selecionado?: boolean;
+  onToggle?: (id: number) => void;
 }
 
-function tempoNaEtapa(iso: string): { label: string; colorClass: string } {
-  const dias = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);
-  if (dias === 0) return { label: 'hoje', colorClass: 'text-muted-foreground' };
-  if (dias === 1) return { label: '1 dia', colorClass: 'text-muted-foreground' };
-  if (dias < 7) return { label: `${dias} dias`, colorClass: 'text-yellow-600' };
-  if (dias < 14) return { label: `${dias} dias`, colorClass: 'text-orange-600 font-medium' };
-  return { label: `${dias} dias`, colorClass: 'text-red-600 font-semibold' };
-}
-
-export function CardItem({ card }: { card: KanbanCardData }) {
+export function CardItem({ card, modoSelecao, selecionado, onToggle }: CardItemProps) {
+  const router = useRouter();
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: String(card.id),
+    disabled: modoSelecao,
   });
 
   const style = transform
@@ -42,35 +36,46 @@ export function CardItem({ card }: { card: KanbanCardData }) {
       ? 'bg-blue-50 text-blue-700 border-blue-200'
       : 'bg-amber-50 text-amber-700 border-amber-200';
 
-  const tempo = tempoNaEtapa(card.colunaDeSde);
+  function handleClick() {
+    if (modoSelecao) {
+      onToggle?.(card.id);
+    } else if (!isDragging) {
+      router.push(`/cards/${card.id}`);
+    }
+  }
 
   return (
     <div
       ref={setNodeRef}
       style={style}
-      {...listeners}
-      {...attributes}
-      className={`rounded-md border bg-card p-3 shadow-sm cursor-grab ${isDragging ? 'opacity-50' : ''}`}
+      {...(modoSelecao ? {} : { ...listeners, ...attributes })}
+      onClick={handleClick}
+      className={`relative rounded-md border bg-card p-3 shadow-sm select-none transition-shadow ${
+        modoSelecao
+          ? selecionado
+            ? 'ring-2 ring-primary cursor-pointer'
+            : 'cursor-pointer hover:ring-1 hover:ring-muted-foreground'
+          : isDragging
+          ? 'opacity-50 cursor-grabbing'
+          : 'cursor-pointer hover:shadow-md'
+      }`}
     >
-      <div className="flex items-start justify-between gap-2 mb-1">
-        <Link
-          href={`/cards/${card.id}`}
-          className="font-medium text-sm hover:underline truncate"
-          onClick={(e) => e.stopPropagation()}
+      {modoSelecao && (
+        <span
+          className={`absolute top-2 right-2 w-4 h-4 rounded border flex items-center justify-center text-xs
+            ${selecionado ? 'bg-primary border-primary text-primary-foreground' : 'border-muted-foreground bg-background'}`}
         >
-          {card.contatoNome}
-        </Link>
-        <span className={`text-xs px-1.5 py-0.5 rounded border whitespace-nowrap ${tipoColor}`}>
+          {selecionado && '✓'}
+        </span>
+      )}
+      <div className="flex items-start justify-between gap-2 mb-1">
+        <span className="font-medium text-sm truncate pr-5">{card.contatoNome}</span>
+        <span className={`text-xs px-1.5 py-0.5 rounded border whitespace-nowrap ${tipoColor} ${modoSelecao ? 'invisible' : ''}`}>
           {tipoLabel}
         </span>
       </div>
-      <div className="text-xs text-muted-foreground flex justify-between">
-        <span>{formatCurrency(card.valorPedido)}</span>
-        <span>{formatDate(card.dataPrevistaAcao)}</span>
-      </div>
-      <div className="mt-1.5 flex items-center gap-1">
-        <span className={`text-xs ${tempo.colorClass}`}>{tempo.label}</span>
-        <span className="text-xs text-muted-foreground">nesta etapa</span>
+      <div className="text-xs text-muted-foreground">
+        {formatCurrency(card.valorPedido)}
       </div>
     </div>
   );
