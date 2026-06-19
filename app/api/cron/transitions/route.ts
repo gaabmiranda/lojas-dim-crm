@@ -76,7 +76,7 @@ export async function POST(req: Request) {
   return NextResponse.json({ ok: true, tipo, processados, aplicados, pulados });
 }
 
-type CardComNome = CardInput & { nomeExibido: string | null };
+type CardComNome = CardInput & { nomeExibido: string | null; vendedorId: number | null };
 
 async function selecionarCandidatos(
   tipo: 'd14' | 'sem_resposta' | 'reativacao' | 'arquivar',
@@ -123,6 +123,7 @@ async function selecionarCandidatos(
       dataPrevistaAcao: cards.dataPrevistaAcao,
       atualizadoEm: cards.atualizadoEm,
       nomeExibido: cards.nomeExibido,
+      vendedorId: cards.vendedorId,
     })
     .from(cards)
     .where(base.where)
@@ -151,6 +152,7 @@ async function aplicarTransicao(card: CardComNome, t: Transicao): Promise<void> 
         nomeExibido: `Reativação · ${card.nomeExibido ?? `contato ${t.criarNovoCard.contatoId}`}`,
         dataPrevistaAcao: t.criarNovoCard.dataPrevistaAcao,
         tentativasReativacao: 0,
+        vendedorId: card.vendedorId,
       });
     } else if (t.tipo === 'enviar_reativacao') {
       await tx

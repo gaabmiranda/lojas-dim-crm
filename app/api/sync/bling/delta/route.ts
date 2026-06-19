@@ -176,7 +176,7 @@ async function upsertPedidoBling(blingPedido: import('@/lib/bling/types').BlingP
         : null,
     );
 
-    // Resolve vendedor: upsert no lookup e busca o usuarioId mapeado
+    // Resolve vendedor: upsert no lookup, busca id; se não vier do Bling → round-robin
     let vendedorId: number | null = null;
     if (blingPedido.vendedor?.id) {
       await tx.insert(vendedoresBling).values({
@@ -192,6 +192,15 @@ async function upsertPedidoBling(blingPedido: import('@/lib/bling/types').BlingP
         .where(eq(vendedoresBling.idBling, blingPedido.vendedor.id))
         .limit(1);
       vendedorId = vb[0]?.id ?? null;
+    }
+    if (!vendedorId) {
+      // Round-robin: atribui ao vendedor com menos cards ativos
+      const least = await tx.execute<{ id: number }>(drizzleSql`
+        SELECT vb.id FROM vendedores_bling vb
+        LEFT JOIN cards c ON c.vendedor_id = vb.id AND c.coluna != 'arquivo'
+        GROUP BY vb.id ORDER BY count(c.id) ASC, vb.id ASC LIMIT 1
+      `);
+      vendedorId = (least[0] as { id: number } | undefined)?.id ?? null;
     }
 
     if (transicao.cancelarCardId) {

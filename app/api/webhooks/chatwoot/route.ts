@@ -123,9 +123,10 @@ export async function POST(req: Request) {
         contatoId: transicao.criarNovoCard.contatoId,
         tipo: 'reativacao',
         coluna: 'pendente',
-        nomeExibido: `Reativação · contato ${contato.id}`,
+        nomeExibido: cardAtivo.nomeExibido ?? `Reativação · contato ${contato.id}`,
         dataPrevistaAcao: transicao.criarNovoCard.dataPrevistaAcao,
         tentativasReativacao: 0,
+        vendedorId: cardAtivo.vendedorId,
       });
     }
   });
