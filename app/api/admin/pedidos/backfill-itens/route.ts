@@ -52,23 +52,26 @@ export async function POST(req: Request) {
   let primeiroErro: string | null = null;
 
   for (const row of candidatos as { id: number; id_bling: number }[]) {
+    const pedidoId = Number(row.id);
+    const idBling = Number(row.id_bling); // bigint vem como string do pg
     try {
-      const idBling = Number(row.id_bling); // bigint vem como string do pg
       const blingPedido = await getPedido(idBling);
 
-      // Sempre atualiza dadosCompletosJson com a resposta completa (marca como verificado).
-      // JSON.stringify necessário: drizzleSql raw não serializa objetos JS para jsonb automaticamente.
+      // Sempre marca como verificado antes de inserir itens.
       await db.execute(drizzleSql`
         UPDATE pedidos
         SET dados_completos_json = ${JSON.stringify(blingPedido)}::jsonb,
             atualizado_em = now()
-        WHERE id = ${Number(row.id)}
+        WHERE id = ${pedidoId}
       `);
 
       if (blingPedido.itens && blingPedido.itens.length > 0) {
+        // DELETE antes de INSERT: idempotência caso pedido seja re-processado
+        // (ex: delta sync sobrescreve JSON removendo key 'itens').
+        await db.delete(pedidoItens).where(drizzleSql`pedido_id = ${pedidoId}`);
         await db.insert(pedidoItens).values(
           blingPedido.itens.map((i) => ({
-            pedidoId: row.id,
+            pedidoId,
             descricao: i.descricao,
             quantidade: String(i.quantidade ?? 0),
             valorUnitario: String(i.valor ?? 0),
@@ -82,8 +85,18 @@ export async function POST(req: Request) {
     } catch (err) {
       erros++;
       const msg = err instanceof Error ? err.message : String(err);
-      if (!primeiroErro) primeiroErro = `pedido ${row.id} (bling ${row.id_bling}): ${msg}`;
-      console.error(`[backfill-itens] pedido ${row.id} (bling ${row.id_bling}):`, err);
+      if (!primeiroErro) primeiroErro = `pedido ${pedidoId} (bling ${idBling}): ${msg}`;
+      console.error(`[backfill-itens] pedido ${pedidoId} (bling ${idBling}):`, err);
+      // Marca como verificado (itens:[]) para parar reprocessamento infinito.
+      await db.execute(drizzleSql`
+        UPDATE pedidos
+        SET dados_completos_json = jsonb_set(
+          COALESCE(dados_completos_json, '{}'),
+          '{itens}',
+          '[]'
+        ), atualizado_em = now()
+        WHERE id = ${pedidoId}
+      `).catch(() => {});
     }
     processados++;
   }

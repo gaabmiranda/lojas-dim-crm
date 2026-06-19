@@ -50,6 +50,13 @@
       "when": 1781996000000,
       "tag": "0006_cards_vendedor_fk_bling",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1782000000000,
+      "tag": "0007_dedup_pedido_itens",
+      "breakpoints": true
     }
   ]
 }
