@@ -3,7 +3,6 @@ import { auth } from '@/lib/auth';
 import { FeatureFlagsTab } from './FeatureFlagsTab';
 import { UsuariosTab } from './UsuariosTab';
 import { TemplatesTab } from './TemplatesTab';
-import { VendedoresTab } from './VendedoresTab';
 
 export default async function ConfigPage({
   searchParams,
@@ -27,12 +26,10 @@ export default async function ConfigPage({
         <TabLink slug="flags" current={tab} label="Feature Flags" />
         <TabLink slug="usuarios" current={tab} label="Usuários" />
         <TabLink slug="templates" current={tab} label="Templates" />
-        <TabLink slug="vendedores" current={tab} label="Vendedores" />
       </nav>
       {tab === 'flags' && <FeatureFlagsTab />}
       {tab === 'usuarios' && <UsuariosTab />}
       {tab === 'templates' && <TemplatesTab />}
-      {tab === 'vendedores' && <VendedoresTab />}
     </div>
   );
 }

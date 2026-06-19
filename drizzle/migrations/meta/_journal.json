@@ -43,6 +43,13 @@
       "when": 1781910000000,
       "tag": "0005_vendedores_usuario_id",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1781996000000,
+      "tag": "0006_cards_vendedor_fk_bling",
+      "breakpoints": true
     }
   ]
 }

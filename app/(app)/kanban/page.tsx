@@ -1,6 +1,6 @@
 import { asc, and, eq } from 'drizzle-orm';
 import { db } from '@/db/client';
-import { cards, usuarios, type ColunaCard, type TipoCard, tipoCardEnum } from '@/db/schema';
+import { cards, vendedoresBling, type ColunaCard, type TipoCard, tipoCardEnum } from '@/db/schema';
 import { KanbanBoard, type KanbanCardData } from './KanbanBoard';
 
 const COLUNAS: { id: ColunaCard; titulo: string }[] = [
@@ -37,7 +37,7 @@ async function carregarColuna(
     tentativasReativacao: c.tentativasReativacao,
     colunaDeSde: c.colunaDeSde.toISOString(),
     vendedorId: c.vendedorId,
-    vendedorNome: c.vendedor?.nome ?? null,
+    vendedorNome: c.vendedor?.contatoNome ?? null,
   }));
 }
 
@@ -61,11 +61,9 @@ export default async function KanbanPage({
     Promise.all(
       COLUNAS.map(async (c) => ({ ...c, items: await carregarColuna(c.id, filtros) })),
     ),
-    db.query.usuarios.findMany({
-      where: eq(usuarios.ativo, true),
-      columns: { id: true, nome: true },
-      orderBy: [asc(usuarios.nome)],
-    }),
+    db.select({ id: vendedoresBling.id, nome: vendedoresBling.contatoNome })
+      .from(vendedoresBling)
+      .orderBy(asc(vendedoresBling.contatoNome)),
   ]);
 
   return (

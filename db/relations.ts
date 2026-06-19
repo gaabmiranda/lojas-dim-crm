@@ -9,6 +9,7 @@ import {
   pedidoItens,
   pedidos,
   usuarios,
+  vendedoresBling,
 } from './schema';
 
 export const contatosRelations = relations(contatos, ({ many }) => ({
@@ -41,9 +42,9 @@ export const cardsRelations = relations(cards, ({ one, many }) => ({
     fields: [cards.pedidoIdOrigem],
     references: [pedidos.id],
   }),
-  vendedor: one(usuarios, {
+  vendedor: one(vendedoresBling, {
     fields: [cards.vendedorId],
-    references: [usuarios.id],
+    references: [vendedoresBling.id],
   }),
   atividades: many(atividades),
   comentarios: many(comentarios),

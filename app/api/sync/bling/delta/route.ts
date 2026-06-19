@@ -187,11 +187,11 @@ async function upsertPedidoBling(blingPedido: import('@/lib/bling/types').BlingP
         target: vendedoresBling.idBling,
         set: { contatoNome: drizzleSql`excluded.contato_nome` },
       });
-      const vb = await tx.select({ usuarioId: vendedoresBling.usuarioId })
+      const vb = await tx.select({ id: vendedoresBling.id })
         .from(vendedoresBling)
         .where(eq(vendedoresBling.idBling, blingPedido.vendedor.id))
         .limit(1);
-      vendedorId = vb[0]?.usuarioId ?? null;
+      vendedorId = vb[0]?.id ?? null;
     }
 
     if (transicao.cancelarCardId) {

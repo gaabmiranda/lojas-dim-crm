@@ -135,7 +135,7 @@ export const cards = pgTable(
       withTimezone: true,
       mode: 'date',
     }),
-    vendedorId: integer('vendedor_id').references(() => usuarios.id),
+    vendedorId: integer('vendedor_id').references(() => vendedoresBling.id),
     criadoEm: timestamp('criado_em', { withTimezone: true, mode: 'date' })
       .notNull()
       .defaultNow(),
