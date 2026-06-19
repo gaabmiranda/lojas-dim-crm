@@ -90,7 +90,13 @@ interface Stats {
 }
 
 function calcStats(pedidoOrigem: PedidoOrigem | null, historico: PedidoHistorico[]): Stats {
-  const all = [...historico, ...(pedidoOrigem ? [pedidoOrigem] : [])];
+  // historico já inclui o pedidoOrigem; deduplicar por id evita dupla contagem.
+  const seen = new Set<number>();
+  const all = [...historico, ...(pedidoOrigem ? [pedidoOrigem] : [])].filter(p => {
+    if (seen.has(p.id)) return false;
+    seen.add(p.id);
+    return true;
+  });
   const numPedidos = all.length;
   const ltv = all.reduce((s, p) => s + Number(p.total ?? 0), 0);
   const ticketMedio = numPedidos > 0 ? ltv / numPedidos : 0;
@@ -102,7 +108,12 @@ function calcStats(pedidoOrigem: PedidoOrigem | null, historico: PedidoHistorico
 
 function calcProdutoFavorito(pedidoOrigem: PedidoOrigem | null, historico: PedidoHistorico[]): string | null {
   const freq: Record<string, number> = {};
-  const itens = [...(pedidoOrigem?.itens ?? []), ...historico.flatMap(p => p.itens)];
+  const origemId = pedidoOrigem?.id;
+  const itens = [
+    ...historico.flatMap(p => p.itens),
+    // inclui itens do pedidoOrigem só se ele não estiver no historico
+    ...(pedidoOrigem && !historico.some(p => p.id === origemId) ? pedidoOrigem.itens : []),
+  ];
   for (const item of itens) {
     if (!item.descricao) continue;
     const key = item.descricao.split(' ').slice(0, 3).join(' ');
