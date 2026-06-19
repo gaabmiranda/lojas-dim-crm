@@ -158,12 +158,21 @@ const COLUNA_LABELS: Record<string, string> = {
 function EtapaStepper({ card }: { card: Pick<CardData, 'id' | 'coluna' | 'tipo'> }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+  const [confirmarFinalizar, setConfirmarFinalizar] = useState(false);
 
-  const idx = COLUNAS_ORDER.indexOf(card.coluna as (typeof COLUNAS_ORDER)[number]);
-  const prevColuna = idx > 0 ? COLUNAS_ORDER[idx - 1] : null;
-  const nextColuna = idx < COLUNAS_ORDER.length - 1 ? COLUNAS_ORDER[idx + 1] : null;
+  const currentIdx = COLUNAS_ORDER.indexOf(card.coluna as (typeof COLUNAS_ORDER)[number]);
 
   function moverPara(coluna: string) {
+    if (coluna === card.coluna) return;
+    if (coluna === 'finalizado' && card.tipo === 'pos_venda') {
+      setConfirmarFinalizar(true);
+      return;
+    }
+    executarMover(coluna);
+  }
+
+  function executarMover(coluna: string) {
+    setConfirmarFinalizar(false);
     startTransition(async () => {
       const resp = await fetch(`/api/cards/${card.id}`, {
         method: 'PATCH',
@@ -185,39 +194,61 @@ function EtapaStepper({ card }: { card: Pick<CardData, 'id' | 'coluna' | 'tipo'>
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-3">
-      <div className="flex items-center gap-1">
-        {COLUNAS_ORDER.map((c, i) => (
-          <span key={c} className="flex items-center gap-1">
-            <span className={`text-xs px-2 py-0.5 rounded ${
-              c === card.coluna
-                ? 'bg-primary text-primary-foreground font-medium'
-                : i < idx
-                ? 'text-muted-foreground line-through'
-                : 'text-muted-foreground'
-            }`}>
-              {COLUNA_LABELS[c]}
-            </span>
-            {i < COLUNAS_ORDER.length - 1 && <span className="text-muted-foreground text-xs">→</span>}
-          </span>
-        ))}
+    <div className="space-y-2">
+      {/* Segmented control — 1 clique para qualquer etapa */}
+      <div className="flex rounded-md border overflow-hidden w-full">
+        {COLUNAS_ORDER.map((c, i) => {
+          const isCurrent = c === card.coluna;
+          const isPast = i < currentIdx;
+          const isFinalizar = c === 'finalizado' && card.tipo === 'pos_venda';
+          return (
+            <button
+              key={c}
+              onClick={() => moverPara(c)}
+              disabled={pending || isCurrent}
+              title={isFinalizar ? 'Arquiva o card e agenda reativação em 90 dias' : undefined}
+              className={`flex-1 py-2 text-xs font-medium transition-colors
+                ${i > 0 ? 'border-l' : ''}
+                ${isCurrent
+                  ? 'bg-primary text-primary-foreground cursor-default'
+                  : isPast
+                  ? 'bg-muted/40 text-muted-foreground hover:bg-muted cursor-pointer'
+                  : 'hover:bg-muted/60 cursor-pointer'
+                }
+                disabled:opacity-100
+              `}
+            >
+              {isPast && <span className="mr-1">✓</span>}
+              {isFinalizar ? 'Finalizar ✓' : COLUNA_LABELS[c]}
+            </button>
+          );
+        })}
       </div>
-      <div className="flex gap-2 ml-auto">
-        {prevColuna && (
-          <button onClick={() => moverPara(prevColuna)} disabled={pending}
-            className="text-xs border px-3 py-1 rounded-md hover:bg-muted disabled:opacity-50 transition-colors">
-            ← {COLUNA_LABELS[prevColuna]}
-          </button>
-        )}
-        {nextColuna && (
-          <button onClick={() => moverPara(nextColuna)} disabled={pending}
-            className="text-xs bg-primary text-primary-foreground px-3 py-1 rounded-md hover:opacity-90 disabled:opacity-50 transition-opacity">
-            {card.tipo === 'pos_venda' && nextColuna === 'finalizado'
-              ? 'Finalizar (arquiva) →'
-              : `${COLUNA_LABELS[nextColuna]} →`}
-          </button>
-        )}
-      </div>
+
+      {/* Confirmação inline — só para finalizar pós-venda (irreversível) */}
+      {confirmarFinalizar && (
+        <div className="p-3 border rounded-md bg-amber-50 border-amber-200 text-sm">
+          <p className="font-medium text-amber-800">Finalizar pós-venda?</p>
+          <p className="text-amber-700 text-xs mt-0.5">
+            O card será arquivado e uma reativação agendada para 90 dias.
+          </p>
+          <div className="flex gap-2 mt-2">
+            <button
+              onClick={() => executarMover('finalizado')}
+              disabled={pending}
+              className="bg-primary text-primary-foreground px-3 py-1 rounded text-xs disabled:opacity-50"
+            >
+              Confirmar
+            </button>
+            <button
+              onClick={() => setConfirmarFinalizar(false)}
+              className="border px-3 py-1 rounded text-xs hover:bg-muted"
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
