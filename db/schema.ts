@@ -142,9 +142,13 @@ export const cards = pgTable(
     atualizadoEm: timestamp('atualizado_em', { withTimezone: true, mode: 'date' })
       .notNull()
       .defaultNow(),
+    colunaDeSde: timestamp('coluna_desde', { withTimezone: true, mode: 'date' })
+      .notNull()
+      .defaultNow(),
   },
   (t) => ({
     colunaDataIdx: index('cards_coluna_data_idx').on(t.coluna, t.dataPrevistaAcao),
+    colunaDesdeIdx: index('cards_coluna_desde_idx').on(t.colunaDeSde),
     contatoIdx: index('cards_contato_idx').on(t.contatoId),
     // Partial unique: 1 card ativo por contato (coluna != 'arquivo')
     contatoAtivoUnique: uniqueIndex('cards_contato_ativo_unique')

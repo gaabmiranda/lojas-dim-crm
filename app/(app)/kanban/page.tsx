@@ -1,6 +1,6 @@
-import { desc, and, eq } from 'drizzle-orm';
+import { asc, and, eq } from 'drizzle-orm';
 import { db } from '@/db/client';
-import { cards, type ColunaCard } from '@/db/schema';
+import { cards, usuarios, type ColunaCard, type TipoCard, tipoCardEnum } from '@/db/schema';
 import { KanbanBoard, type KanbanCardData } from './KanbanBoard';
 
 const COLUNAS: { id: ColunaCard; titulo: string }[] = [
@@ -9,15 +9,23 @@ const COLUNAS: { id: ColunaCard; titulo: string }[] = [
   { id: 'finalizado', titulo: 'Finalizado' },
 ];
 
-const PER_COLUMN = 50;
+const PER_COLUMN = 200;
 
-async function carregarColuna(col: ColunaCard): Promise<KanbanCardData[]> {
+async function carregarColuna(
+  col: ColunaCard,
+  filtros: { vendedorId?: number; tipo?: TipoCard },
+): Promise<KanbanCardData[]> {
+  const where = [eq(cards.coluna, col)];
+  if (filtros.vendedorId) where.push(eq(cards.vendedorId, filtros.vendedorId));
+  if (filtros.tipo) where.push(eq(cards.tipo, filtros.tipo));
+
   const rows = await db.query.cards.findMany({
-    where: and(eq(cards.coluna, col)),
-    with: { contato: true, pedidoOrigem: true },
-    orderBy: [desc(cards.criadoEm)],
+    where: and(...where),
+    with: { contato: true, pedidoOrigem: true, vendedor: true },
+    orderBy: [asc(cards.colunaDeSde)],
     limit: PER_COLUMN,
   });
+
   return rows.map((c) => ({
     id: c.id,
     contatoNome: c.contato?.nome ?? c.nomeExibido,
@@ -27,13 +35,38 @@ async function carregarColuna(col: ColunaCard): Promise<KanbanCardData[]> {
     valorPedido: c.pedidoOrigem?.total ?? null,
     dataPrevistaAcao: c.dataPrevistaAcao?.toISOString() ?? null,
     tentativasReativacao: c.tentativasReativacao,
+    colunaDeSde: c.colunaDeSde.toISOString(),
+    vendedorId: c.vendedorId,
+    vendedorNome: c.vendedor?.nome ?? null,
   }));
 }
 
-export default async function KanbanPage() {
-  const colunasComCards = await Promise.all(
-    COLUNAS.map(async (c) => ({ ...c, items: await carregarColuna(c.id) })),
-  );
+export default async function KanbanPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const params = await searchParams;
+
+  const vendedorIdParam = params.vendedor_id ? Number(params.vendedor_id) : undefined;
+  const tipoParam =
+    typeof params.tipo === 'string' &&
+    (tipoCardEnum.enumValues as readonly string[]).includes(params.tipo)
+      ? (params.tipo as TipoCard)
+      : undefined;
+
+  const filtros = { vendedorId: vendedorIdParam, tipo: tipoParam };
+
+  const [colunasComCards, vendedores] = await Promise.all([
+    Promise.all(
+      COLUNAS.map(async (c) => ({ ...c, items: await carregarColuna(c.id, filtros) })),
+    ),
+    db.query.usuarios.findMany({
+      where: eq(usuarios.ativo, true),
+      columns: { id: true, nome: true },
+      orderBy: [asc(usuarios.nome)],
+    }),
+  ]);
 
   return (
     <div className="p-6">
@@ -43,7 +76,12 @@ export default async function KanbanPage() {
           {colunasComCards.reduce((a, c) => a + c.items.length, 0)} cards ativos
         </p>
       </header>
-      <KanbanBoard colunas={colunasComCards} />
+      <KanbanBoard
+        key={`${vendedorIdParam ?? 0}-${tipoParam ?? ''}`}
+        colunas={colunasComCards}
+        vendedores={vendedores}
+        filtros={{ vendedorId: vendedorIdParam ?? null, tipo: tipoParam ?? null }}
+      />
     </div>
   );
 }

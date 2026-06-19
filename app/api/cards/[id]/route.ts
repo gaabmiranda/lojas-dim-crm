@@ -66,7 +66,10 @@ export async function PATCH(req: Request, { params }: RouteParams) {
   }
 
   const updates: Record<string, unknown> = { atualizadoEm: drizzleSql`now()` };
-  if (parsed.data.coluna) updates.coluna = parsed.data.coluna;
+  if (parsed.data.coluna) {
+    updates.coluna = parsed.data.coluna;
+    updates.colunaDeSde = drizzleSql`now()`;
+  }
   if (parsed.data.vendedorId !== undefined) updates.vendedorId = parsed.data.vendedorId;
   if (parsed.data.nomeExibido) updates.nomeExibido = parsed.data.nomeExibido;
 
@@ -95,7 +98,7 @@ export async function PATCH(req: Request, { params }: RouteParams) {
     const [arquivado] = await db.transaction(async (tx) => {
       const [arq] = await tx
         .update(cards)
-        .set({ coluna: 'arquivo', atualizadoEm: drizzleSql`now()` })
+        .set({ coluna: 'arquivo', atualizadoEm: drizzleSql`now()`, colunaDeSde: drizzleSql`now()` })
         .where(eq(cards.id, id))
         .returning();
 

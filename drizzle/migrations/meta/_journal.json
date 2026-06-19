@@ -22,6 +22,20 @@
       "when": 1749301200000,
       "tag": "0002_ensure_unique_constraints",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1781818846137,
+      "tag": "0003_public_bloodstorm",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1781830000000,
+      "tag": "0004_kanban_coluna_desde",
+      "breakpoints": true
     }
   ]
 }

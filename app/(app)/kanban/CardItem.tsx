@@ -17,6 +17,15 @@ function formatDate(iso: string | null): string {
   return d.toLocaleDateString('pt-BR');
 }
 
+function tempoNaEtapa(iso: string): { label: string; colorClass: string } {
+  const dias = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);
+  if (dias === 0) return { label: 'hoje', colorClass: 'text-muted-foreground' };
+  if (dias === 1) return { label: '1 dia', colorClass: 'text-muted-foreground' };
+  if (dias < 7) return { label: `${dias} dias`, colorClass: 'text-yellow-600' };
+  if (dias < 14) return { label: `${dias} dias`, colorClass: 'text-orange-600 font-medium' };
+  return { label: `${dias} dias`, colorClass: 'text-red-600 font-semibold' };
+}
+
 export function CardItem({ card }: { card: KanbanCardData }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: String(card.id),
@@ -26,11 +35,14 @@ export function CardItem({ card }: { card: KanbanCardData }) {
     ? { transform: `translate(${transform.x}px, ${transform.y}px)` }
     : undefined;
 
-  const tipoLabel = card.tipo === 'pos_venda' ? 'Pós-venda' : `Reativação ${card.tentativasReativacao}/3`;
+  const tipoLabel =
+    card.tipo === 'pos_venda' ? 'Pós-venda' : `Reativação ${card.tentativasReativacao}/3`;
   const tipoColor =
     card.tipo === 'pos_venda'
       ? 'bg-blue-50 text-blue-700 border-blue-200'
       : 'bg-amber-50 text-amber-700 border-amber-200';
+
+  const tempo = tempoNaEtapa(card.colunaDeSde);
 
   return (
     <div
@@ -55,6 +67,10 @@ export function CardItem({ card }: { card: KanbanCardData }) {
       <div className="text-xs text-muted-foreground flex justify-between">
         <span>{formatCurrency(card.valorPedido)}</span>
         <span>{formatDate(card.dataPrevistaAcao)}</span>
+      </div>
+      <div className="mt-1.5 flex items-center gap-1">
+        <span className={`text-xs ${tempo.colorClass}`}>{tempo.label}</span>
+        <span className="text-xs text-muted-foreground">nesta etapa</span>
       </div>
     </div>
   );
