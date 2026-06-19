@@ -4,7 +4,7 @@ import { db } from '@/db/client';
 import { cards, contatos, pedidoItens, pedidos, vendedoresBling } from '@/db/schema';
 import { logEvent } from '@/lib/audit';
 import { getFlag, setFlag } from '@/lib/feature-flags';
-import { listPedidos } from '@/lib/bling/client';
+import { getPedido, listPedidos } from '@/lib/bling/client';
 import { mapContato, mapPedido } from '@/lib/bling/mapper';
 import { SITUACAO_VALOR } from '@/lib/bling/types';
 import { verifyN8nSecret } from '@/lib/n8n/trigger';
@@ -52,6 +52,9 @@ export async function POST(req: Request) {
       const result = await upsertPedidoBling(blingPedido);
       totalProcessados++;
       if (result?.cardCriado) novosCards++;
+      if (result?.needsItemFetch) {
+        await fetchAndSaveItens(result.pedidoId, result.idBling);
+      }
     }
 
     if (resp.data.length < PAGE_LIMIT) break;
@@ -88,6 +91,9 @@ function isoDateDaysAgo(n: number): string {
 
 interface UpsertResult {
   cardCriado: boolean;
+  pedidoId: number;
+  idBling: number;
+  needsItemFetch: boolean;
 }
 
 async function upsertPedidoBling(blingPedido: import('@/lib/bling/types').BlingPedidoVenda): Promise<UpsertResult | null> {
@@ -124,24 +130,31 @@ async function upsertPedidoBling(blingPedido: import('@/lib/bling/types').BlingP
           situacaoValor: pedido.situacaoValor,
           total: pedido.total,
           totalProdutos: pedido.totalProdutos,
-          dadosCompletosJson: pedido.dadosCompletosJson,
+          // dadosCompletosJson omitido: preserva dados buscados individualmente (com itens)
           atualizadoEm: drizzleSql`now()`,
         },
       })
-      .returning({ id: pedidos.id, situacaoId: pedidos.situacaoId });
+      .returning({ id: pedidos.id, situacaoId: pedidos.situacaoId, dadosCompletosJson: pedidos.dadosCompletosJson });
     const pedidoLocal = insertedPedido[0]!;
+
+    // Determina se itens precisam ser buscados individualmente.
+    // A API de listagem não retorna itens; só o GET individual inclui esse campo.
+    const jsonAtual = pedidoLocal.dadosCompletosJson as Record<string, unknown> | null;
+    const needsItemFetch = !jsonAtual || !('itens' in jsonAtual);
 
     if (itens.length > 0) {
       await tx.delete(pedidoItens).where(drizzleSql`pedido_id = ${pedidoLocal.id}`);
       await tx.insert(pedidoItens).values(itens.map((i) => ({ ...i, pedidoId: pedidoLocal.id })));
     }
 
+    const idBling = Number(blingPedido.id);
+
     if (pedidoLocal.situacaoId !== SITUACAO_VALOR.ATENDIDO) {
-      return { cardCriado: false };
+      return { cardCriado: false, pedidoId: pedidoLocal.id, idBling, needsItemFetch };
     }
 
     if (contatoLocal.freezingAte && contatoLocal.freezingAte.getTime() > Date.now()) {
-      return { cardCriado: false };
+      return { cardCriado: false, pedidoId: pedidoLocal.id, idBling, needsItemFetch };
     }
 
     // Já existe card ativo? Idempotência: nada a fazer.
@@ -152,7 +165,7 @@ async function upsertPedidoBling(blingPedido: import('@/lib/bling/types').BlingP
       .limit(1);
 
     if (cardAtivo[0] && cardAtivo[0].pedidoIdOrigem === pedidoLocal.id) {
-      return { cardCriado: false };
+      return { cardCriado: false, pedidoId: pedidoLocal.id, idBling, needsItemFetch };
     }
 
     const transicao = transicaoPorNovaCompra(
@@ -221,6 +234,36 @@ async function upsertPedidoBling(blingPedido: import('@/lib/bling/types').BlingP
       vendedorId,
     });
 
-    return { cardCriado: true };
+    return { cardCriado: true, pedidoId: pedidoLocal.id, idBling, needsItemFetch };
   });
+}
+
+async function fetchAndSaveItens(pedidoId: number, idBling: number): Promise<void> {
+  try {
+    const fullPedido = await getPedido(idBling);
+    await db.execute(drizzleSql`
+      UPDATE pedidos SET dados_completos_json = ${JSON.stringify(fullPedido)}::jsonb,
+      atualizado_em = now() WHERE id = ${pedidoId}
+    `);
+    if (fullPedido.itens && fullPedido.itens.length > 0) {
+      await db.delete(pedidoItens).where(drizzleSql`pedido_id = ${pedidoId}`);
+      await db.insert(pedidoItens).values(
+        fullPedido.itens.map((i) => ({
+          pedidoId,
+          descricao: i.descricao,
+          quantidade: String(i.quantidade ?? 0),
+          valorUnitario: String(i.valor ?? 0),
+          valorTotal: String((i.quantidade ?? 0) * (i.valor ?? 0)),
+        })),
+      );
+    }
+  } catch (err) {
+    console.error(`[delta-sync] fetchAndSaveItens pedido ${pedidoId} (bling ${idBling}):`, err);
+    // Marca itens:[] para não re-tentar em loop em pedidos que a API não retorna.
+    await db.execute(drizzleSql`
+      UPDATE pedidos SET dados_completos_json = jsonb_set(
+        COALESCE(dados_completos_json, '{}'), '{itens}', '[]'
+      ), atualizado_em = now() WHERE id = ${pedidoId}
+    `).catch(() => {});
+  }
 }

@@ -180,22 +180,12 @@ function EtapaStepper({ card }: { card: Pick<CardData, 'id' | 'coluna' | 'tipo'>
 }
 
 function Header({ card }: { card: CardData }) {
-  const [pending, startTransition] = useTransition();
-
-  async function abrirWhatsapp() {
-    startTransition(async () => {
-      try {
-        const resp = await fetch(`/api/cards/${card.id}/whatsapp`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({}),
-        });
-        if (!resp.ok) throw new Error(await resp.text());
-        toast.success('Conversa aberta no Chatwoot.');
-      } catch (err) {
-        toast.error('Falha ao abrir WhatsApp: ' + (err as Error).message);
-      }
-    });
+  function abrirWhatsapp() {
+    const fone = card.contato.telefone;
+    if (!fone) return;
+    // Adiciona DDI 55 (Brasil) se o número ainda não tiver código de país (< 12 dígitos).
+    const numero = fone.length < 12 ? `55${fone}` : fone;
+    window.open(`https://wa.me/${numero}`, '_blank', 'noopener,noreferrer');
   }
 
   const diasNaEtapa = Math.floor(
@@ -226,10 +216,10 @@ function Header({ card }: { card: CardData }) {
         </div>
         <button
           onClick={abrirWhatsapp}
-          disabled={pending || !card.contato.telefone}
+          disabled={!card.contato.telefone}
           className="bg-primary text-primary-foreground px-4 py-2 rounded-md text-sm font-medium disabled:opacity-50"
         >
-          {pending ? 'Abrindo…' : 'Abrir WhatsApp'}
+          Abrir WhatsApp
         </button>
       </div>
 
