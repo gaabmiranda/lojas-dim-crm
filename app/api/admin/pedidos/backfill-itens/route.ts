@@ -49,17 +49,19 @@ export async function POST(req: Request) {
   let comItens = 0;
   let semItensNoBling = 0;
   let erros = 0;
+  let primeiroErro: string | null = null;
 
   for (const row of candidatos as { id: number; id_bling: number }[]) {
     try {
-      const blingPedido = await getPedido(row.id_bling);
+      const idBling = Number(row.id_bling); // bigint vem como string do pg
+      const blingPedido = await getPedido(idBling);
 
       // Sempre atualiza dadosCompletosJson com a resposta completa (marca como verificado).
       await db.execute(drizzleSql`
         UPDATE pedidos
         SET dados_completos_json = ${blingPedido as unknown as Record<string, unknown>}::jsonb,
             atualizado_em = now()
-        WHERE id = ${row.id}
+        WHERE id = ${Number(row.id)}
       `);
 
       if (blingPedido.itens && blingPedido.itens.length > 0) {
@@ -78,6 +80,8 @@ export async function POST(req: Request) {
       }
     } catch (err) {
       erros++;
+      const msg = err instanceof Error ? err.message : String(err);
+      if (!primeiroErro) primeiroErro = `pedido ${row.id} (bling ${row.id_bling}): ${msg}`;
       console.error(`[backfill-itens] pedido ${row.id} (bling ${row.id_bling}):`, err);
     }
     processados++;
@@ -102,6 +106,7 @@ export async function POST(req: Request) {
     comItens,
     semItensNoBling,
     erros,
+    primeiroErro,
     remaining: (remaining[0] as { count: number } | undefined)?.count ?? 0,
   });
 }
