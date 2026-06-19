@@ -28,6 +28,7 @@ export default async function CardDetailPage({ params }: PageProps) {
     where: eq(pedidos.contatoId, card.contatoId),
     orderBy: [desc(pedidos.data)],
     limit: 10,
+    with: { itens: true },
   });
 
   return <CardDetail card={card} historico={historico} />;

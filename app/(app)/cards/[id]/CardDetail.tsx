@@ -34,6 +34,7 @@ interface PedidoHistorico {
   data: Date | null;
   total: string | null;
   situacaoValor: number | null;
+  itens: PedidoItem[];
 }
 
 interface Atividade {
@@ -255,6 +256,34 @@ function Header({ card }: { card: CardData }) {
   );
 }
 
+function ItensTable({ itens }: { itens: PedidoItem[] }) {
+  if (itens.length === 0) {
+    return <p className="text-sm text-muted-foreground italic">Itens não disponíveis (pedido sincronizado sem detalhe).</p>;
+  }
+  return (
+    <table className="w-full text-sm mt-2">
+      <thead className="text-left text-muted-foreground">
+        <tr>
+          <th className="py-1 pr-2">Item</th>
+          <th className="py-1 pr-2">Qtd</th>
+          <th className="py-1 text-right pr-2">Unit.</th>
+          <th className="py-1 text-right">Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        {itens.map((i) => (
+          <tr key={i.id} className="border-t">
+            <td className="py-1 pr-2">{i.descricao}</td>
+            <td className="py-1 pr-2">{i.quantidade}</td>
+            <td className="py-1 text-right pr-2">{formatCurrency(i.valorUnitario)}</td>
+            <td className="py-1 text-right">{formatCurrency(i.valorTotal)}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
 function PedidoOrigemSection({ pedido }: { pedido: PedidoOrigem | null }) {
   if (!pedido) {
     return (
@@ -266,29 +295,10 @@ function PedidoOrigemSection({ pedido }: { pedido: PedidoOrigem | null }) {
   }
   return (
     <section className="border rounded-lg p-4 bg-card">
-      <h2 className="font-medium mb-3">
-        Pedido #{pedido.numero} — {formatDate(pedido.data)} — Total {formatCurrency(pedido.total)}
+      <h2 className="font-medium mb-1">
+        Pedido #{pedido.numero} · {formatDate(pedido.data)} · <span className="font-semibold">{formatCurrency(pedido.total)}</span>
       </h2>
-      <table className="w-full text-sm">
-        <thead className="text-left text-muted-foreground">
-          <tr>
-            <th className="py-1">Item</th>
-            <th className="py-1">Qtd</th>
-            <th className="py-1 text-right">Unit.</th>
-            <th className="py-1 text-right">Total</th>
-          </tr>
-        </thead>
-        <tbody>
-          {pedido.itens.map((i) => (
-            <tr key={i.id} className="border-t">
-              <td className="py-1">{i.descricao}</td>
-              <td className="py-1">{i.quantidade}</td>
-              <td className="py-1 text-right">{formatCurrency(i.valorUnitario)}</td>
-              <td className="py-1 text-right">{formatCurrency(i.valorTotal)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <ItensTable itens={pedido.itens} />
     </section>
   );
 }
@@ -301,17 +311,35 @@ function HistoricoSection({
   cardContatoId: number;
 }) {
   void cardContatoId;
+  const [expandido, setExpandido] = useState<number | null>(null);
+
   return (
     <section className="border rounded-lg p-4 bg-card">
       <h2 className="font-medium mb-3">Histórico de compras — últimos 10</h2>
       {historico.length === 0 ? (
         <p className="text-sm text-muted-foreground">Sem pedidos anteriores.</p>
       ) : (
-        <ul className="space-y-1 text-sm">
+        <ul className="text-sm divide-y">
           {historico.map((p) => (
-            <li key={p.id} className="flex justify-between border-b last:border-0 py-1">
-              <span>#{p.numero} · {formatDate(p.data)}</span>
-              <span>{formatCurrency(p.total)} · sit. {p.situacaoValor ?? '—'}</span>
+            <li key={p.id}>
+              <button
+                type="button"
+                onClick={() => setExpandido(expandido === p.id ? null : p.id)}
+                className="w-full flex justify-between items-center py-2 hover:bg-muted/50 px-1 rounded text-left"
+              >
+                <span className="flex items-center gap-2">
+                  <span className="text-muted-foreground">{expandido === p.id ? '▾' : '▸'}</span>
+                  <span>#{p.numero} · {formatDate(p.data)}</span>
+                </span>
+                <span className="text-right text-muted-foreground">
+                  {formatCurrency(p.total)}
+                </span>
+              </button>
+              {expandido === p.id && (
+                <div className="px-4 pb-3">
+                  <ItensTable itens={p.itens} />
+                </div>
+              )}
             </li>
           ))}
         </ul>
