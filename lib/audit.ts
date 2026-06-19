@@ -6,7 +6,8 @@ export type EventoOrigem =
   | 'chatwoot_webhook'
   | 'n8n_cron'
   | 'api_interna'
-  | 'bootstrap';
+  | 'bootstrap'
+  | 'retroativo';
 
 export interface LogEventArgs {
   tipo: string;

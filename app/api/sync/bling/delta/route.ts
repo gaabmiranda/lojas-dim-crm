@@ -22,10 +22,17 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true, skipped: 'polling desativado' });
   }
 
+  // ?desde=YYYY-MM-DD força data inicial (modo retroativo) sem atualizar BLING_LAST_SYNC_AT
+  const url = new URL(req.url);
+  const desdeParam = url.searchParams.get('desde');
+  const modoRetroativo = !!desdeParam;
+
   const lastSyncRaw = await getFlag('BLING_LAST_SYNC_AT');
-  const dataAlteracaoInicial = lastSyncRaw && lastSyncRaw !== ''
-    ? new Date(lastSyncRaw).toISOString().slice(0, 10)
-    : isoDateDaysAgo(7);
+  const dataAlteracaoInicial = desdeParam
+    ? desdeParam
+    : (lastSyncRaw && lastSyncRaw !== ''
+        ? new Date(lastSyncRaw).toISOString().slice(0, 10)
+        : isoDateDaysAgo(7));
 
   let pagina = 1;
   let totalProcessados = 0;
@@ -49,15 +56,19 @@ export async function POST(req: Request) {
 
     if (resp.data.length < PAGE_LIMIT) break;
     pagina++;
-    if (pagina > 100) break; // sanity
+    if (pagina > 500) break; // sanity (retroativo pode ter muitas páginas)
   }
 
-  await setFlag('BLING_LAST_SYNC_AT', inicioSync.toISOString());
+  // Modo retroativo não avança o ponteiro de sync
+  if (!modoRetroativo) {
+    await setFlag('BLING_LAST_SYNC_AT', inicioSync.toISOString());
+  }
+
   await logEvent({
-    tipo: 'sync_delta',
-    origem: 'n8n_cron',
+    tipo: modoRetroativo ? 'sync_retroativo' : 'sync_delta',
+    origem: modoRetroativo ? 'retroativo' : 'n8n_cron',
     externalId: `delta-${inicioSync.toISOString().slice(0, 13)}`,
-    payload: { totalProcessados, novosCards, dataAlteracaoInicial },
+    payload: { totalProcessados, novosCards, dataAlteracaoInicial, modoRetroativo },
   });
 
   return NextResponse.json({
@@ -65,6 +76,7 @@ export async function POST(req: Request) {
     totalProcessados,
     novosCards,
     dataAlteracaoInicial,
+    modoRetroativo,
     syncedAt: inicioSync.toISOString(),
   });
 }
