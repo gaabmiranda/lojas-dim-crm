@@ -11,18 +11,16 @@ export async function POST(req: Request) {
     return new NextResponse('forbidden', { status: 403 });
   }
 
-  // Atualiza cards.vendedor_id lendo vendedor.id do JSON do pedido de origem
-  // e cruzando com o mapeamento em vendedores_bling.usuario_id
+  // Atualiza cards.vendedor_id usando o id de vendedores_bling diretamente
   const result = await db.execute<{ count: number }>(drizzleSql`
     WITH updated AS (
       UPDATE cards c
-      SET vendedor_id = vb.usuario_id
+      SET vendedor_id = vb.id
       FROM pedidos p
       JOIN vendedores_bling vb
         ON (p.dados_completos_json -> 'vendedor' ->> 'id')::bigint = vb.id_bling
       WHERE c.pedido_id_origem = p.id
         AND c.vendedor_id IS NULL
-        AND vb.usuario_id IS NOT NULL
       RETURNING c.id
     )
     SELECT count(*)::int AS count FROM updated
