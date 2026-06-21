@@ -11,6 +11,20 @@ function formatCurrency(valor: string | null): string {
   return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
+function prazoInfo(dataPrevistaAcao: string | null): { label: string; className: string } | null {
+  if (!dataPrevistaAcao) return null;
+  const dpa = new Date(dataPrevistaAcao);
+  const hoje = new Date();
+  const diffMs = dpa.getTime() - hoje.getTime();
+  const dias = Math.ceil(diffMs / 86_400_000);
+  if (dias > 0) {
+    const cor = dias <= 2 ? 'text-amber-600' : 'text-green-600';
+    return { label: `${dias}d para ação`, className: cor };
+  }
+  if (dias === 0) return { label: 'Vence hoje', className: 'text-amber-600 font-semibold' };
+  return { label: `${Math.abs(dias)}d atrasado`, className: 'text-red-600 font-semibold' };
+}
+
 interface CardItemProps {
   card: KanbanCardData;
   modoSelecao?: boolean;
@@ -29,8 +43,10 @@ export function CardItem({ card, modoSelecao, selecionado, onToggle }: CardItemP
     ? { transform: `translate(${transform.x}px, ${transform.y}px)` }
     : undefined;
 
+  const prazo = prazoInfo(card.dataPrevistaAcao);
+
   const tipoLabel =
-    card.tipo === 'pos_venda' ? 'Pós-venda' : `Reativação ${card.tentativasReativacao}/3`;
+    card.tipo === 'pos_venda' ? 'Pós-venda' : 'Reativação';
   const tipoColor =
     card.tipo === 'pos_venda'
       ? 'bg-blue-50 text-blue-700 border-blue-200'
@@ -74,8 +90,11 @@ export function CardItem({ card, modoSelecao, selecionado, onToggle }: CardItemP
           {tipoLabel}
         </span>
       </div>
-      <div className="text-xs text-muted-foreground">
-        {formatCurrency(card.valorPedido)}
+      <div className="flex items-center justify-between gap-2 mt-1">
+        <span className="text-xs text-muted-foreground">{formatCurrency(card.valorPedido)}</span>
+        {prazo && (
+          <span className={`text-xs ${prazo.className}`}>{prazo.label}</span>
+        )}
       </div>
     </div>
   );
