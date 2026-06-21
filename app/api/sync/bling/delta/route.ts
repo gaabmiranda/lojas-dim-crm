@@ -4,8 +4,8 @@ import { db } from '@/db/client';
 import { cards, contatos, pedidoItens, pedidos, vendedoresBling } from '@/db/schema';
 import { logEvent } from '@/lib/audit';
 import { getFlag, setFlag } from '@/lib/feature-flags';
-import { getPedido, listPedidos } from '@/lib/bling/client';
-import { mapContato, mapPedido } from '@/lib/bling/mapper';
+import { getContato, getPedido, listPedidos } from '@/lib/bling/client';
+import { extrairTelefone, mapContato, mapPedido } from '@/lib/bling/mapper';
 import { SITUACAO_VALOR } from '@/lib/bling/types';
 import { verifyN8nSecret } from '@/lib/n8n/trigger';
 import { transicaoPorNovaCompra } from '@/lib/kanban';
@@ -52,6 +52,9 @@ export async function POST(req: Request) {
       const result = await upsertPedidoBling(blingPedido);
       totalProcessados++;
       if (result?.cardCriado) novosCards++;
+      if (result?.needsContactEnrich) {
+        await fetchAndSaveContato(result.contatoId, result.idBlingContato);
+      }
       if (result?.needsItemFetch) {
         await fetchAndSaveItens(result.pedidoId, result.idBling);
       }
@@ -94,6 +97,9 @@ interface UpsertResult {
   pedidoId: number;
   idBling: number;
   needsItemFetch: boolean;
+  contatoId: number;
+  idBlingContato: number;
+  needsContactEnrich: boolean;
 }
 
 async function upsertPedidoBling(blingPedido: import('@/lib/bling/types').BlingPedidoVenda): Promise<UpsertResult | null> {
@@ -113,7 +119,7 @@ async function upsertPedidoBling(blingPedido: import('@/lib/bling/types').BlingP
           atualizadoEm: drizzleSql`now()`,
         },
       })
-      .returning({ id: contatos.id, freezingAte: contatos.freezingAte });
+      .returning({ id: contatos.id, freezingAte: contatos.freezingAte, telefone: contatos.telefone });
     const contatoLocal = insertedContato[0]!;
 
     const { pedido, itens } = mapPedido(blingPedido, contatoLocal.id);
@@ -150,11 +156,11 @@ async function upsertPedidoBling(blingPedido: import('@/lib/bling/types').BlingP
     const idBling = Number(blingPedido.id);
 
     if (pedidoLocal.situacaoId !== SITUACAO_VALOR.ATENDIDO) {
-      return { cardCriado: false, pedidoId: pedidoLocal.id, idBling, needsItemFetch };
+      return { cardCriado: false, pedidoId: pedidoLocal.id, idBling, needsItemFetch, contatoId: contatoLocal.id, idBlingContato: Number(blingPedido.contato.id), needsContactEnrich: !contatoLocal.telefone };
     }
 
     if (contatoLocal.freezingAte && contatoLocal.freezingAte.getTime() > Date.now()) {
-      return { cardCriado: false, pedidoId: pedidoLocal.id, idBling, needsItemFetch };
+      return { cardCriado: false, pedidoId: pedidoLocal.id, idBling, needsItemFetch, contatoId: contatoLocal.id, idBlingContato: Number(blingPedido.contato.id), needsContactEnrich: !contatoLocal.telefone };
     }
 
     // Já existe card ativo? Idempotência: nada a fazer.
@@ -165,7 +171,7 @@ async function upsertPedidoBling(blingPedido: import('@/lib/bling/types').BlingP
       .limit(1);
 
     if (cardAtivo[0] && cardAtivo[0].pedidoIdOrigem === pedidoLocal.id) {
-      return { cardCriado: false, pedidoId: pedidoLocal.id, idBling, needsItemFetch };
+      return { cardCriado: false, pedidoId: pedidoLocal.id, idBling, needsItemFetch, contatoId: contatoLocal.id, idBlingContato: Number(blingPedido.contato.id), needsContactEnrich: !contatoLocal.telefone };
     }
 
     const transicao = transicaoPorNovaCompra(
@@ -239,10 +245,10 @@ async function upsertPedidoBling(blingPedido: import('@/lib/bling/types').BlingP
       // O índice único parcial garantiu a integridade — apenas logamos e saímos sem criar duplicata.
       if ((err as { code?: string }).code !== '23505') throw err;
       console.warn(`[delta-sync] card já existe para contato ${contatoLocal.id} (race condition), ignorando`);
-      return { cardCriado: false, pedidoId: pedidoLocal.id, idBling, needsItemFetch };
+      return { cardCriado: false, pedidoId: pedidoLocal.id, idBling, needsItemFetch, contatoId: contatoLocal.id, idBlingContato: Number(blingPedido.contato.id), needsContactEnrich: !contatoLocal.telefone };
     }
 
-    return { cardCriado: true, pedidoId: pedidoLocal.id, idBling, needsItemFetch };
+    return { cardCriado: true, pedidoId: pedidoLocal.id, idBling, needsItemFetch, contatoId: contatoLocal.id, idBlingContato: Number(blingPedido.contato.id), needsContactEnrich: !contatoLocal.telefone };
   });
 }
 
@@ -273,5 +279,23 @@ async function fetchAndSaveItens(pedidoId: number, idBling: number): Promise<voi
         COALESCE(dados_completos_json, '{}'), '{itens}', '[]'
       ), atualizado_em = now() WHERE id = ${pedidoId}
     `).catch(() => {});
+  }
+}
+
+async function fetchAndSaveContato(contatoId: number, idBlingContato: number): Promise<void> {
+  try {
+    const fullContato = await getContato(idBlingContato);
+    const telefone = extrairTelefone(fullContato);
+    // Só atualiza se o Bling retornou telefone e o campo ainda está vazio (evita sobrescrever edição manual).
+    if (!telefone) return;
+    await db.execute(drizzleSql`
+      UPDATE contatos
+      SET telefone = ${telefone},
+          dados_extras_json = ${JSON.stringify(fullContato)}::jsonb,
+          atualizado_em = now()
+      WHERE id = ${contatoId} AND telefone IS NULL
+    `);
+  } catch (err) {
+    console.error(`[delta-sync] fetchAndSaveContato contato ${contatoId} (bling ${idBlingContato}):`, err);
   }
 }
