@@ -5,7 +5,7 @@ import { db } from '@/db/client';
 import { cards, colunaCardEnum, pedidos } from '@/db/schema';
 import { auth } from '@/lib/auth';
 import { logEvent } from '@/lib/audit';
-import { addDays } from '@/lib/time';
+import { addDays, addHours } from '@/lib/time';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -70,6 +70,10 @@ export async function PATCH(req: Request, { params }: RouteParams) {
   if (parsed.data.coluna) {
     updates.coluna = parsed.data.coluna;
     updates.colunaDeSde = drizzleSql`now()`;
+    // Vendedor finalizou manualmente → agenda cron para criar reativação D+90 após 24h.
+    if (parsed.data.coluna === 'finalizado') {
+      updates.dataPrevistaAcao = addHours(new Date(), 24).toJSDate();
+    }
   }
   if (parsed.data.vendedorId !== undefined) updates.vendedorId = parsed.data.vendedorId;
   if (parsed.data.nomeExibido) updates.nomeExibido = parsed.data.nomeExibido;
@@ -91,57 +95,6 @@ export async function PATCH(req: Request, { params }: RouteParams) {
     cardId: id,
     payload: { changes: parsed.data, by: session.user.id },
   });
-
-  // Quando vendedor move pos_venda → finalizado, arquiva o card e agenda reativação D+90.
-  // Executado em transação: arquivar libera o unique index parcial (WHERE coluna != 'arquivo'),
-  // depois o insert de reativação é feito atomicamente. Interrupção entre os dois não deixa
-  // o contato sem card ativo.
-  if (parsed.data.coluna === 'finalizado' && updated.tipo === 'pos_venda') {
-    const dpa = addDays(new Date(), 90).toJSDate();
-
-    const [arquivado] = await db.transaction(async (tx) => {
-      const [arq] = await tx
-        .update(cards)
-        .set({ coluna: 'arquivo', atualizadoEm: drizzleSql`now()`, colunaDeSde: drizzleSql`now()` })
-        .where(eq(cards.id, id))
-        .returning();
-
-      try {
-        await tx.insert(cards).values({
-          contatoId: updated.contatoId,
-          tipo: 'reativacao',
-          coluna: 'pendente',
-          nomeExibido: `Reativação · ${updated.nomeExibido}`,
-          dataPrevistaAcao: dpa,
-          tentativasReativacao: 0,
-        });
-        await logEvent({
-          tipo: 'card_criado_auto',
-          origem: 'api_interna',
-          cardId: id,
-          payload: { motivo: 'pos_venda_finalizado_d90', contatoId: updated.contatoId, dpa },
-        });
-      } catch (err) {
-        // 23505 = unique_violation: já existe card ativo para o contato → noop legítimo.
-        // Qualquer outro erro é re-lançado para rollback da transação.
-        const pgCode = (err as { code?: string }).code;
-        if (pgCode !== '23505') throw err;
-        console.warn(`[cards/patch] card de reativação D+90 já existe para contato ${updated.contatoId}, ignorando`);
-      }
-
-      return [arq];
-    });
-
-    if (arquivado) {
-      await logEvent({
-        tipo: 'card_patch',
-        origem: 'api_interna',
-        cardId: id,
-        payload: { changes: { coluna: 'arquivo' }, by: 'sistema_d90' },
-      });
-      return NextResponse.json(arquivado);
-    }
-  }
 
   return NextResponse.json(updated);
 }
