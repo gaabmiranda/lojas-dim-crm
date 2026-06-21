@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation';
-import { desc, eq } from 'drizzle-orm';
+import { and, desc, eq, ne } from 'drizzle-orm';
 import { db } from '@/db/client';
 import { cards, pedidos } from '@/db/schema';
 import { CardDetail } from './CardDetail';
@@ -24,12 +24,20 @@ export default async function CardDetailPage({ params }: PageProps) {
   });
   if (!card) notFound();
 
-  const historico = await db.query.pedidos.findMany({
-    where: eq(pedidos.contatoId, card.contatoId),
-    orderBy: [desc(pedidos.data)],
-    limit: 10,
-    with: { itens: true },
-  });
+  const [historico, cardsAnteriores] = await Promise.all([
+    db.query.pedidos.findMany({
+      where: eq(pedidos.contatoId, card.contatoId),
+      orderBy: [desc(pedidos.data)],
+      limit: 10,
+      with: { itens: true },
+    }),
+    db.query.cards.findMany({
+      where: and(eq(cards.contatoId, card.contatoId), eq(cards.coluna, 'arquivo'), ne(cards.id, id)),
+      orderBy: [desc(cards.atualizadoEm)],
+      limit: 30,
+      with: { pedidoOrigem: true },
+    }),
+  ]);
 
-  return <CardDetail card={card} historico={historico} />;
+  return <CardDetail card={card} historico={historico} cardsAnteriores={cardsAnteriores} />;
 }

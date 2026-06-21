@@ -67,6 +67,14 @@ interface CardData {
   comentarios: Comentario[];
 }
 
+interface CardAnterior {
+  id: number;
+  tipo: string;
+  colunaDeSde: Date;
+  atualizadoEm: Date;
+  pedidoOrigem: { numero: string | null; data: Date | null; total: string | null } | null;
+}
+
 // --- Helpers ---
 
 function formatCurrency(v: string | number | null | undefined) {
@@ -125,7 +133,15 @@ function calcProdutoFavorito(pedidoOrigem: PedidoOrigem | null, historico: Pedid
 
 // --- Root component ---
 
-export function CardDetail({ card, historico }: { card: CardData; historico: PedidoHistorico[] }) {
+export function CardDetail({
+  card,
+  historico,
+  cardsAnteriores,
+}: {
+  card: CardData;
+  historico: PedidoHistorico[];
+  cardsAnteriores: CardAnterior[];
+}) {
   const stats = calcStats(card.pedidoOrigem, historico);
   const produtoFav = calcProdutoFavorito(card.pedidoOrigem, historico);
 
@@ -140,6 +156,7 @@ export function CardDetail({ card, historico }: { card: CardData; historico: Ped
       <Header card={card} stats={stats} produtoFav={produtoFav} onAdicionarNota={scrollToNota} />
       <PedidoOrigemSection pedido={card.pedidoOrigem} />
       <HistoricoSection historico={historico} cardContatoId={card.contato.id} />
+      <CardsAnterioresSection cards={cardsAnteriores} />
       <TimelineSection cardId={card.id} atividades={card.atividades} comentarios={card.comentarios} />
     </div>
   );
@@ -287,7 +304,7 @@ function Header({
     : stats.diasSemComprar > 60 ? 'text-amber-600'
     : 'text-green-600';
 
-  const tipoLabel = card.tipo === 'pos_venda' ? 'Pós-venda' : `Reativação ${card.tentativasReativacao}/3`;
+  const tipoLabel = card.tipo === 'pos_venda' ? 'Pós-venda' : 'Reativação';
   const tipoColor = card.tipo === 'pos_venda'
     ? 'bg-blue-50 text-blue-700 border-blue-200'
     : 'bg-amber-50 text-amber-700 border-amber-200';
@@ -436,6 +453,63 @@ function PedidoOrigemSection({ pedido }: { pedido: PedidoOrigem | null }) {
         <span className="font-semibold">{formatCurrency(pedido.total)}</span>
       </h2>
       <ItensTable itens={pedido.itens} />
+    </section>
+  );
+}
+
+// --- CardsAnterioresSection ---
+
+function CardsAnterioresSection({ cards }: { cards: CardAnterior[] }) {
+  const [aberto, setAberto] = useState(false);
+
+  if (cards.length === 0) return null;
+
+  const TIPO_COLOR: Record<string, string> = {
+    pos_venda: 'bg-blue-50 text-blue-700 border-blue-200',
+    reativacao: 'bg-amber-50 text-amber-700 border-amber-200',
+  };
+  const TIPO_LABEL: Record<string, string> = {
+    pos_venda: 'Pós-venda',
+    reativacao: 'Reativação',
+  };
+
+  return (
+    <section className="border rounded-lg p-4 bg-card">
+      <button
+        type="button"
+        onClick={() => setAberto(!aberto)}
+        className="w-full flex items-center justify-between"
+      >
+        <h2 className="font-medium">Ciclos anteriores</h2>
+        <span className="text-xs text-muted-foreground">
+          {cards.length} registro{cards.length !== 1 ? 's' : ''} {aberto ? '▴' : '▾'}
+        </span>
+      </button>
+
+      {aberto && (
+        <ul className="mt-3 divide-y text-sm">
+          {cards.map((c) => (
+            <li key={c.id} className="py-2.5 flex items-center justify-between gap-4">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className={`text-xs px-1.5 py-0.5 rounded border ${TIPO_COLOR[c.tipo] ?? ''}`}>
+                  {TIPO_LABEL[c.tipo] ?? c.tipo}
+                </span>
+                {c.pedidoOrigem?.numero && (
+                  <span className="text-muted-foreground">#{c.pedidoOrigem.numero}</span>
+                )}
+                <span className="text-muted-foreground text-xs">
+                  {formatDate(c.colunaDeSde)} → {formatDate(c.atualizadoEm)}
+                </span>
+              </div>
+              {c.pedidoOrigem?.total && (
+                <span className="font-medium whitespace-nowrap">
+                  {formatCurrency(c.pedidoOrigem.total)}
+                </span>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
     </section>
   );
 }

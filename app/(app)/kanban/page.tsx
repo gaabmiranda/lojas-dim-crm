@@ -1,4 +1,4 @@
-import { asc, and, eq, isNull } from 'drizzle-orm';
+import { asc, desc, and, eq } from 'drizzle-orm';
 import { db } from '@/db/client';
 import { cards, vendedoresBling, type ColunaCard, type TipoCard, tipoCardEnum } from '@/db/schema';
 import { KanbanBoard, type KanbanCardData } from './KanbanBoard';
@@ -41,6 +41,35 @@ async function carregarColuna(
   }));
 }
 
+async function carregarArquivados(
+  filtros: { vendedorId?: number; tipo?: TipoCard },
+): Promise<KanbanCardData[]> {
+  const where = [eq(cards.coluna, 'arquivo')];
+  if (filtros.vendedorId) where.push(eq(cards.vendedorId, filtros.vendedorId));
+  if (filtros.tipo) where.push(eq(cards.tipo, filtros.tipo));
+
+  const rows = await db.query.cards.findMany({
+    where: and(...where),
+    with: { contato: true, pedidoOrigem: true, vendedor: true },
+    orderBy: [desc(cards.atualizadoEm)],
+    limit: PER_COLUMN,
+  });
+
+  return rows.map((c) => ({
+    id: c.id,
+    contatoNome: c.contato?.nome ?? c.nomeExibido,
+    nomeExibido: c.nomeExibido,
+    tipo: c.tipo,
+    coluna: c.coluna,
+    valorPedido: c.pedidoOrigem?.total ?? null,
+    dataPrevistaAcao: c.dataPrevistaAcao?.toISOString() ?? null,
+    tentativasReativacao: c.tentativasReativacao,
+    colunaDeSde: c.colunaDeSde.toISOString(),
+    vendedorId: c.vendedorId,
+    vendedorNome: c.vendedor?.contatoNome ?? null,
+  }));
+}
+
 export default async function KanbanPage({
   searchParams,
 }: {
@@ -54,16 +83,18 @@ export default async function KanbanPage({
     (tipoCardEnum.enumValues as readonly string[]).includes(params.tipo)
       ? (params.tipo as TipoCard)
       : undefined;
+  const mostrarArquivados = params.arquivados === '1';
 
   const filtros = { vendedorId: vendedorIdParam, tipo: tipoParam };
 
-  const [colunasComCards, vendedores] = await Promise.all([
+  const [colunasComCards, vendedores, arquivadoCards] = await Promise.all([
     Promise.all(
       COLUNAS.map(async (c) => ({ ...c, items: await carregarColuna(c.id, filtros) })),
     ),
     db.select({ id: vendedoresBling.id, nome: vendedoresBling.contatoNome })
       .from(vendedoresBling)
       .orderBy(asc(vendedoresBling.contatoNome)),
+    mostrarArquivados ? carregarArquivados(filtros) : Promise.resolve(undefined),
   ]);
 
   return (
@@ -75,10 +106,11 @@ export default async function KanbanPage({
         </p>
       </header>
       <KanbanBoard
-        key={`${vendedorIdParam ?? 0}-${tipoParam ?? ''}`}
+        key={`${vendedorIdParam ?? 0}-${tipoParam ?? ''}-${mostrarArquivados ? '1' : '0'}`}
         colunas={colunasComCards}
         vendedores={vendedores}
         filtros={{ vendedorId: vendedorIdParam ?? null, tipo: tipoParam ?? null }}
+        arquivadoCards={arquivadoCards}
       />
     </div>
   );

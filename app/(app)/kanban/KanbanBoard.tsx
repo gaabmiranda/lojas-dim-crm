@@ -53,13 +53,16 @@ export function KanbanBoard({
   colunas: initialColunas,
   vendedores,
   filtros,
+  arquivadoCards,
 }: {
   colunas: KanbanColuna[];
   vendedores: Vendedor[];
   filtros: Filtros;
+  arquivadoCards?: KanbanCardData[];
 }) {
   const [colunas, setColunas] = useState(initialColunas);
   const [localFiltros, setLocalFiltros] = useState<Filtros>(filtros);
+  const [busca, setBusca] = useState('');
 
   // Modo seleção em massa
   const [modoSelecao, setModoSelecao] = useState(false);
@@ -79,13 +82,40 @@ export function KanbanBoard({
     return map;
   }, [colunas]);
 
+  function filtrarItems(items: KanbanCardData[]) {
+    if (!busca.trim()) return items;
+    const q = busca.toLowerCase();
+    return items.filter(
+      (c) =>
+        c.contatoNome.toLowerCase().includes(q) ||
+        c.nomeExibido.toLowerCase().includes(q),
+    );
+  }
+
+  function buildParams(overrides: Partial<Filtros & { arquivados: boolean }> = {}) {
+    const v = overrides.vendedorId !== undefined ? overrides.vendedorId : localFiltros.vendedorId;
+    const t = overrides.tipo !== undefined ? overrides.tipo : localFiltros.tipo;
+    const arq = overrides.arquivados !== undefined ? overrides.arquivados : arquivadoCards !== undefined;
+    const params = new URLSearchParams();
+    if (v) params.set('vendedor_id', String(v));
+    if (t) params.set('tipo', t);
+    if (arq) params.set('arquivados', '1');
+    return params.toString();
+  }
+
   function aplicarFiltro(novo: Partial<Filtros>) {
     const next: Filtros = { ...localFiltros, ...novo };
     setLocalFiltros(next);
     const params = new URLSearchParams();
     if (next.vendedorId) params.set('vendedor_id', String(next.vendedorId));
     if (next.tipo) params.set('tipo', next.tipo);
+    if (arquivadoCards !== undefined) params.set('arquivados', '1');
     router.replace(`/kanban?${params.toString()}`);
+  }
+
+  function toggleArquivados() {
+    const novoArq = arquivadoCards === undefined;
+    router.replace(`/kanban?${buildParams({ arquivados: novoArq })}`);
   }
 
   function toggleCard(id: number) {
@@ -177,9 +207,28 @@ export function KanbanBoard({
 
   const filtroAtivo = localFiltros.vendedorId !== null || localFiltros.tipo !== null;
   const totalCards = colunas.reduce((a, c) => a + c.items.length, 0);
+  const arquivadosFiltrados = arquivadoCards ? filtrarItems(arquivadoCards) : undefined;
 
   return (
     <div>
+      {/* Barra de busca */}
+      <div className="mb-3">
+        <input
+          type="search"
+          value={busca}
+          onChange={(e) => setBusca(e.target.value)}
+          placeholder="Buscar cliente ou card…"
+          className="w-full border rounded-lg px-3 py-2 text-sm bg-background focus:outline-none focus:ring-1 focus:ring-primary"
+        />
+        {busca.trim() && (
+          <p className="text-xs text-muted-foreground mt-1 px-1">
+            {colunas.reduce((a, c) => a + filtrarItems(c.items).length, 0) +
+              (arquivadosFiltrados?.length ?? 0)}{' '}
+            resultado(s)
+          </p>
+        )}
+      </div>
+
       {/* Barra de filtros + controles */}
       <div className="flex flex-wrap items-center gap-4 mb-4 p-3 rounded-lg bg-muted/30 border">
         {!modoSelecao ? (
@@ -233,12 +282,24 @@ export function KanbanBoard({
               </button>
             )}
 
-            <button
-              onClick={entrarSelecao}
-              className="ml-auto text-xs border px-3 py-1.5 rounded-md hover:bg-muted transition-colors"
-            >
-              Selecionar em massa
-            </button>
+            <div className="ml-auto flex items-center gap-2">
+              <button
+                onClick={toggleArquivados}
+                className={`text-xs border px-3 py-1.5 rounded-md transition-colors ${
+                  arquivadoCards !== undefined
+                    ? 'bg-foreground text-background border-foreground'
+                    : 'hover:bg-muted'
+                }`}
+              >
+                {arquivadoCards !== undefined ? 'Ocultar arquivados' : 'Ver arquivados'}
+              </button>
+              <button
+                onClick={entrarSelecao}
+                className="text-xs border px-3 py-1.5 rounded-md hover:bg-muted transition-colors"
+              >
+                Selecionar em massa
+              </button>
+            </div>
           </>
         ) : (
           <>
@@ -307,7 +368,7 @@ export function KanbanBoard({
           {colunas.map((col) => (
             <Coluna
               key={col.id}
-              coluna={col}
+              coluna={{ ...col, items: filtrarItems(col.items) }}
               modoSelecao={modoSelecao}
               selecionados={selecionados}
               onToggle={toggleCard}
@@ -315,6 +376,29 @@ export function KanbanBoard({
           ))}
         </div>
       </DndContext>
+
+      {/* Seção arquivados */}
+      {arquivadoCards !== undefined && (
+        <div className="mt-6 border-t pt-6">
+          <h2 className="font-medium text-sm text-muted-foreground mb-3">
+            Arquivados —{' '}
+            {arquivadosFiltrados!.length}
+            {arquivadoCards.length > arquivadosFiltrados!.length &&
+              ` de ${arquivadoCards.length}`}
+          </h2>
+          {arquivadosFiltrados!.length === 0 ? (
+            <p className="text-xs text-muted-foreground py-4">
+              {busca.trim() ? 'Nenhum arquivado corresponde à busca.' : 'Nenhum card arquivado.'}
+            </p>
+          ) : (
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-2">
+              {arquivadosFiltrados!.map((card) => (
+                <CardItem key={card.id} card={card} />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
