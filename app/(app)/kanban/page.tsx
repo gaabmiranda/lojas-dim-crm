@@ -1,4 +1,4 @@
-import { asc, and, eq } from 'drizzle-orm';
+import { asc, and, eq, isNull } from 'drizzle-orm';
 import { db } from '@/db/client';
 import { cards, vendedoresBling, type ColunaCard, type TipoCard, tipoCardEnum } from '@/db/schema';
 import { KanbanBoard, type KanbanCardData } from './KanbanBoard';
@@ -22,7 +22,7 @@ async function carregarColuna(
   const rows = await db.query.cards.findMany({
     where: and(...where),
     with: { contato: true, pedidoOrigem: true, vendedor: true },
-    orderBy: [asc(cards.colunaDeSde)],
+    orderBy: [asc(cards.dataPrevistaAcao)],
     limit: PER_COLUMN,
   });
 
