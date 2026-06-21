@@ -223,16 +223,24 @@ async function upsertPedidoBling(blingPedido: import('@/lib/bling/types').BlingP
         .where(eq(cards.id, transicao.cancelarCardId));
     }
 
-    await tx.insert(cards).values({
-      contatoId: transicao.criarNovoCard.contatoId,
-      pedidoIdOrigem: transicao.criarNovoCard.pedidoIdOrigem,
-      tipo: 'pos_venda',
-      coluna: 'pendente',
-      nomeExibido: blingPedido.contato.nome ?? `Cliente #${contatoLocal.id}`,
-      dataPrevistaAcao: transicao.criarNovoCard.dataPrevistaAcao,
-      tentativasReativacao: 0,
-      vendedorId,
-    });
+    try {
+      await tx.insert(cards).values({
+        contatoId: transicao.criarNovoCard.contatoId,
+        pedidoIdOrigem: transicao.criarNovoCard.pedidoIdOrigem,
+        tipo: 'pos_venda',
+        coluna: 'pendente',
+        nomeExibido: blingPedido.contato.nome ?? `Cliente #${contatoLocal.id}`,
+        dataPrevistaAcao: transicao.criarNovoCard.dataPrevistaAcao,
+        tentativasReativacao: 0,
+        vendedorId,
+      });
+    } catch (err) {
+      // 23505 = race condition benigna: outra transação inseriu card ativo para o mesmo contato.
+      // O índice único parcial garantiu a integridade — apenas logamos e saímos sem criar duplicata.
+      if ((err as { code?: string }).code !== '23505') throw err;
+      console.warn(`[delta-sync] card já existe para contato ${contatoLocal.id} (race condition), ignorando`);
+      return { cardCriado: false, pedidoId: pedidoLocal.id, idBling, needsItemFetch };
+    }
 
     return { cardCriado: true, pedidoId: pedidoLocal.id, idBling, needsItemFetch };
   });

@@ -126,6 +126,7 @@ export async function PATCH(req: Request, { params }: RouteParams) {
         // Qualquer outro erro é re-lançado para rollback da transação.
         const pgCode = (err as { code?: string }).code;
         if (pgCode !== '23505') throw err;
+        console.warn(`[cards/patch] card de reativação D+90 já existe para contato ${updated.contatoId}, ignorando`);
       }
 
       return [arq];
