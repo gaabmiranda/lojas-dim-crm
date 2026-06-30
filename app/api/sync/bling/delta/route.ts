@@ -129,6 +129,7 @@ async function upsertPedidoBling(blingPedido: import('@/lib/bling/types').BlingP
       .onConflictDoUpdate({
         target: pedidos.idBling,
         set: {
+          contatoId: pedido.contatoId,
           numero: pedido.numero,
           data: pedido.data,
           dataSaida: pedido.dataSaida,

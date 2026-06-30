@@ -24,7 +24,7 @@ export default async function CardDetailPage({ params }: PageProps) {
   });
   if (!card) notFound();
 
-  const [historico, cardsAnteriores] = await Promise.all([
+  const [historicoBase, cardsAnteriores] = await Promise.all([
     db.query.pedidos.findMany({
       where: eq(pedidos.contatoId, card.contatoId),
       orderBy: [desc(pedidos.data)],
@@ -38,6 +38,14 @@ export default async function CardDetailPage({ params }: PageProps) {
       with: { pedidoOrigem: true },
     }),
   ]);
+
+  // Garante que o pedidoOrigem aparece no histórico mesmo quando seu contatoId difere
+  // (pode acontecer se o pedido foi inserido com contato errado antes da correção do upsert).
+  const historicoIds = new Set(historicoBase.map((p) => p.id));
+  const historico =
+    card.pedidoOrigem && !historicoIds.has(card.pedidoOrigem.id)
+      ? [card.pedidoOrigem, ...historicoBase]
+      : historicoBase;
 
   return <CardDetail card={card} historico={historico} cardsAnteriores={cardsAnteriores} />;
 }
