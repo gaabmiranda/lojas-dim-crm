@@ -35,7 +35,9 @@ export async function POST(req: Request) {
   }
 
   const url = new URL(req.url);
-  const numeroForcado = url.searchParams.get('numero');
+  // Aceita numero tanto via body (mais confiável com proxies) quanto via query param.
+  const bodyRaw = await req.json().catch(() => ({})) as Record<string, unknown>;
+  const numeroForcado = (bodyRaw.numero as string | undefined) || url.searchParams.get('numero');
   const batch = Math.min(50, Math.max(1, Number(url.searchParams.get('batch') ?? '30')));
 
   // Modo forçado: re-fetch independente do estado atual do pedido.
