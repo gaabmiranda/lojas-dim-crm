@@ -45,7 +45,7 @@ export async function POST(req: Request) {
   const dryRun = confirm !== 'APAGAR_TODOS';
 
   // 1. Busca último pedido ATENDIDO por contato
-  const rows = await db.execute<LastPedidoRow>(drizzleSql`
+  const rows = (await db.execute(drizzleSql`
     SELECT DISTINCT ON (p.contato_id)
       p.id        AS pedido_id,
       p.contato_id,
@@ -56,7 +56,7 @@ export async function POST(req: Request) {
     WHERE p.situacao_valor = ${SITUACAO_ATENDIDO}
       AND COALESCE(p.data_saida, p.data) IS NOT NULL
     ORDER BY p.contato_id, COALESCE(p.data_saida, p.data) DESC NULLS LAST
-  `);
+  `)) as unknown as LastPedidoRow[];
 
   // 2. Busca vendedores para round-robin
   const vendedores = await db.select({ id: vendedoresBling.id }).from(vendedoresBling).orderBy(vendedoresBling.id);
@@ -73,7 +73,7 @@ export async function POST(req: Request) {
 
   let cardIdx = 0;
 
-  for (const row of rows as LastPedidoRow[]) {
+  for (const row of rows) {
     const refDt = toBRT(row.ref_date);
     const pvDt = addDays(refDt, 14);
 
