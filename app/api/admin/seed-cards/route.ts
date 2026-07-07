@@ -63,7 +63,7 @@ export async function POST(req: Request) {
 
   function getVendedorId(idx: number): number | null {
     if (vendedores.length === 0) return null;
-    return vendedores[idx % vendedores.length].id;
+    return vendedores[idx % vendedores.length]?.id ?? null;
   }
 
   // 3. Classifica cada contato
@@ -109,7 +109,7 @@ export async function POST(req: Request) {
       ignorados.push({
         contato: row.contato_nome,
         ref_date: row.ref_date,
-        motivo: `pv_date=${pvDt.toISODate()} > janela (>${PV_WINDOW_END.toISODate()})`,
+        motivo: `pv_date=${pvDt.toISODate() ?? '?'} > janela (>${PV_WINDOW_END.toISODate() ?? '?'})`,
       });
     }
   }
