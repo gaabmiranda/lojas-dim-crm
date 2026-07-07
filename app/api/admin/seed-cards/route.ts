@@ -53,7 +53,7 @@ export async function POST(req: Request) {
       COALESCE(p.data_saida, p.data)::text AS ref_date
     FROM pedidos p
     JOIN contatos c ON c.id = p.contato_id
-    WHERE p.situacao_valor = ${SITUACAO_ATENDIDO}
+    WHERE p.situacao_id = ${SITUACAO_ATENDIDO}
       AND COALESCE(p.data_saida, p.data) IS NOT NULL
     ORDER BY p.contato_id, COALESCE(p.data_saida, p.data) DESC NULLS LAST
   `)) as unknown as LastPedidoRow[];
