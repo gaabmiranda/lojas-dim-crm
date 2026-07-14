@@ -8,16 +8,20 @@ import { logEvent } from '@/lib/audit';
 
 export const maxDuration = 60;
 
+// Compara SUM(valor_total) contra total_produtos (preço bruto sem desconto), não contra total
+// (que já tem desconto aplicado). Pedidos com desconto teriam falso-positivo eterno se usássemos total.
+// Fallback para total quando total_produtos é NULL (pedidos antigos sem esse campo).
 const MISMATCH_SQL = drizzleSql`
   SELECT p.id, p.id_bling, p.numero,
          p.total::text AS total,
+         COALESCE(p.total_produtos, p.total)::text AS base_compare,
          COALESCE(SUM(pi.valor_total::numeric), 0)::text AS soma_itens,
          COUNT(pi.id)::int AS num_itens
   FROM pedidos p
   LEFT JOIN pedido_itens pi ON pi.pedido_id = p.id
   WHERE p.total IS NOT NULL AND p.total::numeric > 0
-  GROUP BY p.id, p.id_bling, p.numero, p.total
-  HAVING ABS(COALESCE(SUM(pi.valor_total::numeric), 0) - p.total::numeric) > 5
+  GROUP BY p.id, p.id_bling, p.numero, p.total, p.total_produtos
+  HAVING ABS(COALESCE(SUM(pi.valor_total::numeric), 0) - COALESCE(p.total_produtos, p.total)::numeric) > 5
      AND COALESCE(SUM(pi.valor_total::numeric), 0) > 0
 `;
 
@@ -26,6 +30,7 @@ interface MismatchRow {
   id_bling: number;
   numero: string | null;
   total: string;
+  base_compare: string;
   soma_itens: string;
   num_itens: number;
 }
