@@ -53,6 +53,11 @@ interface Comentario {
   usuario: { nome: string | null; email: string };
 }
 
+interface Vendedor {
+  id: number;
+  contatoNome: string | null;
+}
+
 interface CardData {
   id: number;
   nomeExibido: string;
@@ -65,6 +70,8 @@ interface CardData {
   pedidoOrigem: PedidoOrigem | null;
   atividades: Atividade[];
   comentarios: Comentario[];
+  vendedorId: number | null;
+  vendedor: Vendedor | null;
 }
 
 interface CardAnterior {
@@ -137,10 +144,12 @@ export function CardDetail({
   card,
   historico,
   cardsAnteriores,
+  vendedores,
 }: {
   card: CardData;
   historico: PedidoHistorico[];
   cardsAnteriores: CardAnterior[];
+  vendedores: Vendedor[];
 }) {
   const stats = calcStats(card.pedidoOrigem, historico);
   const produtoFav = calcProdutoFavorito(card.pedidoOrigem, historico);
@@ -153,7 +162,7 @@ export function CardDetail({
 
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6">
-      <Header card={card} stats={stats} produtoFav={produtoFav} onAdicionarNota={scrollToNota} />
+      <Header card={card} stats={stats} produtoFav={produtoFav} onAdicionarNota={scrollToNota} vendedores={vendedores} />
       <PedidoOrigemSection pedido={card.pedidoOrigem} />
       <HistoricoSection historico={historico} cardContatoId={card.contato.id} />
       <CardsAnterioresSection cards={cardsAnteriores} />
@@ -286,14 +295,32 @@ function Header({
   stats,
   produtoFav,
   onAdicionarNota,
+  vendedores,
 }: {
   card: CardData;
   stats: Stats;
   produtoFav: string | null;
   onAdicionarNota: () => void;
+  vendedores: Vendedor[];
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+  const [editandoVendedor, setEditandoVendedor] = useState(false);
+  const [vendedorIdEdit, setVendedorIdEdit] = useState<number | null>(card.vendedorId);
+
+  function salvarVendedor() {
+    startTransition(async () => {
+      const resp = await fetch(`/api/cards/${card.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ vendedorId: vendedorIdEdit }),
+      });
+      if (!resp.ok) { toast.error('Falha ao atualizar vendedor.'); return; }
+      toast.success('Vendedor atualizado.');
+      setEditandoVendedor(false);
+      router.refresh();
+    });
+  }
 
   const diasNaEtapa = Math.floor((Date.now() - new Date(card.colunaDeSde).getTime()) / 86_400_000);
   const etapaColor = diasNaEtapa > 14 ? 'text-red-600' : diasNaEtapa > 7 ? 'text-amber-600' : 'text-muted-foreground';
@@ -381,6 +408,52 @@ function Header({
           <span className="font-medium text-foreground">{produtoFav}</span>
         </p>
       )}
+
+      {/* Vendedor responsável */}
+      <div className="flex items-center gap-2 text-sm border-t pt-3">
+        <span className="text-muted-foreground shrink-0">Vendedor:</span>
+        {editandoVendedor ? (
+          <>
+            <select
+              value={vendedorIdEdit ?? ''}
+              onChange={(e) => setVendedorIdEdit(e.target.value ? Number(e.target.value) : null)}
+              className="border rounded px-2 py-0.5 text-sm bg-background flex-1 max-w-[220px]"
+            >
+              <option value="">Não atribuído</option>
+              {vendedores.map((v) => (
+                <option key={v.id} value={v.id}>
+                  {v.contatoNome ?? `Vendedor #${v.id}`}
+                </option>
+              ))}
+            </select>
+            <button
+              onClick={salvarVendedor}
+              disabled={pending}
+              className="text-xs px-2 py-1 bg-primary text-primary-foreground rounded disabled:opacity-50"
+            >
+              Salvar
+            </button>
+            <button
+              onClick={() => { setEditandoVendedor(false); setVendedorIdEdit(card.vendedorId); }}
+              className="text-xs px-2 py-1 border rounded hover:bg-muted"
+            >
+              Cancelar
+            </button>
+          </>
+        ) : (
+          <>
+            <span className="font-medium">
+              {card.vendedor?.contatoNome ?? 'Não atribuído'}
+            </span>
+            <button
+              onClick={() => setEditandoVendedor(true)}
+              className="text-xs text-muted-foreground hover:text-foreground underline ml-1"
+            >
+              Alterar
+            </button>
+          </>
+        )}
+      </div>
 
       {/* Stage + meta */}
       <div className="space-y-2 pt-1 border-t">

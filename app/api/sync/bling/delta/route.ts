@@ -141,13 +141,26 @@ async function upsertPedidoBling(blingPedido: import('@/lib/bling/types').BlingP
           atualizadoEm: drizzleSql`now()`,
         },
       })
-      .returning({ id: pedidos.id, situacaoId: pedidos.situacaoId, dadosCompletosJson: pedidos.dadosCompletosJson });
+      .returning({ id: pedidos.id, situacaoId: pedidos.situacaoId, dadosCompletosJson: pedidos.dadosCompletosJson, total: pedidos.total });
     const pedidoLocal = insertedPedido[0]!;
 
     // Determina se itens precisam ser buscados individualmente.
     // A API de listagem não retorna itens; só o GET individual inclui esse campo.
     const jsonAtual = pedidoLocal.dadosCompletosJson as Record<string, unknown> | null;
-    const needsItemFetch = !jsonAtual || !('itens' in jsonAtual);
+    let needsItemFetch = !jsonAtual || !('itens' in jsonAtual);
+
+    // Detecta itens corrompidos do bootstrap: soma ≠ total do Bling → re-busca.
+    // Só corre quando items existem (soma > 0) para não reprocessar pedidos sem itens no Bling.
+    if (!needsItemFetch && pedidoLocal.total) {
+      const sumRows = await tx.execute<{ soma: string }>(drizzleSql`
+        SELECT COALESCE(SUM(valor_total::numeric), 0)::text AS soma
+        FROM pedido_itens WHERE pedido_id = ${pedidoLocal.id}
+      `);
+      const soma = Number((sumRows[0] as { soma: string } | undefined)?.soma ?? '0');
+      if (soma > 0 && Math.abs(soma - Number(pedidoLocal.total)) > 5) {
+        needsItemFetch = true;
+      }
+    }
 
     if (itens.length > 0) {
       await tx.delete(pedidoItens).where(drizzleSql`pedido_id = ${pedidoLocal.id}`);

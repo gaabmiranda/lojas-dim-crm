@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation';
 import { and, desc, eq, ne } from 'drizzle-orm';
 import { db } from '@/db/client';
-import { cards, pedidos } from '@/db/schema';
+import { cards, pedidos, vendedoresBling } from '@/db/schema';
 import { CardDetail } from './CardDetail';
 
 interface PageProps {
@@ -20,11 +20,12 @@ export default async function CardDetailPage({ params }: PageProps) {
       pedidoOrigem: { with: { itens: true } },
       atividades: true,
       comentarios: { with: { usuario: true } },
+      vendedor: true,
     },
   });
   if (!card) notFound();
 
-  const [historicoBase, cardsAnteriores] = await Promise.all([
+  const [historicoBase, cardsAnteriores, todosVendedores] = await Promise.all([
     db.query.pedidos.findMany({
       where: eq(pedidos.contatoId, card.contatoId),
       orderBy: [desc(pedidos.data)],
@@ -37,6 +38,7 @@ export default async function CardDetailPage({ params }: PageProps) {
       limit: 30,
       with: { pedidoOrigem: true },
     }),
+    db.select({ id: vendedoresBling.id, contatoNome: vendedoresBling.contatoNome }).from(vendedoresBling).orderBy(vendedoresBling.id),
   ]);
 
   // Garante que o pedidoOrigem aparece no histórico mesmo quando seu contatoId difere
@@ -47,5 +49,5 @@ export default async function CardDetailPage({ params }: PageProps) {
       ? [card.pedidoOrigem, ...historicoBase]
       : historicoBase;
 
-  return <CardDetail card={card} historico={historico} cardsAnteriores={cardsAnteriores} />;
+  return <CardDetail card={card} historico={historico} cardsAnteriores={cardsAnteriores} vendedores={todosVendedores} />;
 }
