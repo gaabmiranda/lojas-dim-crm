@@ -11,7 +11,8 @@ export async function POST(req: Request) {
     return new NextResponse('forbidden', { status: 403 });
   }
 
-  // Fase 1: cruzar dadosCompletosJson.vendedor.id com vendedores_bling
+  // Fase 1: cruzar dadosCompletosJson.vendedor.id com vendedores_bling.
+  // Atualiza TODOS os cards (não só os nulos) — sobrescreve round-robin com o vendedor real do pedido.
   const r1 = await db.execute<{ count: number }>(drizzleSql`
     WITH updated AS (
       UPDATE cards c
@@ -20,7 +21,8 @@ export async function POST(req: Request) {
       JOIN vendedores_bling vb
         ON (p.dados_completos_json -> 'vendedor' ->> 'id')::bigint = vb.id_bling
       WHERE c.pedido_id_origem = p.id
-        AND c.vendedor_id IS NULL
+        AND (p.dados_completos_json -> 'vendedor' ->> 'id') IS NOT NULL
+        AND c.vendedor_id IS DISTINCT FROM vb.id
       RETURNING c.id
     )
     SELECT count(*)::int AS count FROM updated

@@ -20,6 +20,7 @@ interface LastPedidoRow {
   contato_id: number;
   contato_nome: string;
   ref_date: string; // YYYY-MM-DD
+  vendedor_id: number | null;
 }
 
 interface CardCandidate {
@@ -44,24 +45,27 @@ export async function POST(req: Request) {
   const confirm = req.headers.get('x-confirm');
   const dryRun = confirm !== 'APAGAR_TODOS';
 
-  // 1. Busca último pedido ATENDIDO por contato
+  // 1. Busca último pedido ATENDIDO por contato, incluindo o vendedor do Bling
   const rows = (await db.execute(drizzleSql`
     SELECT DISTINCT ON (p.contato_id)
       p.id        AS pedido_id,
       p.contato_id,
       c.nome      AS contato_nome,
-      COALESCE(p.data_saida, p.data)::text AS ref_date
+      COALESCE(p.data_saida, p.data)::text AS ref_date,
+      vb.id AS vendedor_id
     FROM pedidos p
     JOIN contatos c ON c.id = p.contato_id
+    LEFT JOIN vendedores_bling vb
+      ON (p.dados_completos_json -> 'vendedor' ->> 'id')::bigint = vb.id_bling
     WHERE p.situacao_id = ${SITUACAO_ATENDIDO}
       AND COALESCE(p.data_saida, p.data) IS NOT NULL
     ORDER BY p.contato_id, COALESCE(p.data_saida, p.data) DESC NULLS LAST
   `)) as unknown as LastPedidoRow[];
 
-  // 2. Busca vendedores para round-robin
+  // 2. Busca vendedores para round-robin (fallback quando pedido não tem vendedor no Bling)
   const vendedores = await db.select({ id: vendedoresBling.id }).from(vendedoresBling).orderBy(vendedoresBling.id);
 
-  function getVendedorId(idx: number): number | null {
+  function getRoundRobinVendedorId(idx: number): number | null {
     if (vendedores.length === 0) return null;
     return vendedores[idx % vendedores.length]?.id ?? null;
   }
@@ -71,11 +75,13 @@ export async function POST(req: Request) {
   const reativacaoCandidates: CardCandidate[] = [];
   const ignorados: { contato: string; ref_date: string; motivo: string }[] = [];
 
-  let cardIdx = 0;
+  let rrIdx = 0; // round-robin index — só usado quando o pedido não tem vendedor no Bling
 
   for (const row of rows) {
     const refDt = toBRT(row.ref_date);
     const pvDt = addDays(refDt, 14);
+    // Vendedor do pedido tem prioridade; round-robin é só fallback
+    const vendedorId = row.vendedor_id ?? getRoundRobinVendedorId(rrIdx++);
 
     if (pvDt >= PV_WINDOW_START && pvDt <= PV_WINDOW_END) {
       // Grupo A: pós-venda dentro da janela (D+1 a D+14)
@@ -86,7 +92,7 @@ export async function POST(req: Request) {
         tipo: 'pos_venda',
         dataPrevistaAcao: pvDt.toJSDate(),
         tentativasReativacao: 0,
-        vendedorId: getVendedorId(cardIdx++),
+        vendedorId,
       });
     } else if (pvDt < PV_WINDOW_START) {
       // Grupo B: pós-venda já passou → calcular próxima reativação
@@ -102,7 +108,7 @@ export async function POST(req: Request) {
         tipo: 'reativacao',
         dataPrevistaAcao: nextDt.toJSDate(),
         tentativasReativacao: 0,
-        vendedorId: getVendedorId(cardIdx++),
+        vendedorId,
       });
     } else {
       // Grupo C: compra muito recente, fora da janela de 14 dias
