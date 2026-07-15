@@ -11,6 +11,21 @@ export async function POST(req: Request) {
     return new NextResponse('forbidden', { status: 403 });
   }
 
+  // Fase 0: upsert de vendedores que estão em dados_completos_json mas não em vendedores_bling.
+  // Garante que o join da Fase 1 encontre todos os vendedores dos pedidos importados.
+  await db.execute(drizzleSql`
+    INSERT INTO vendedores_bling (id_bling, contato_id_bling, contato_nome)
+    SELECT DISTINCT
+      (dados_completos_json -> 'vendedor' ->> 'id')::bigint AS id_bling,
+      (dados_completos_json -> 'vendedor' -> 'contato' ->> 'id')::bigint AS contato_id_bling,
+      dados_completos_json -> 'vendedor' -> 'contato' ->> 'nome' AS contato_nome
+    FROM pedidos
+    WHERE dados_completos_json -> 'vendedor' ->> 'id' IS NOT NULL
+    ON CONFLICT (id_bling) DO UPDATE
+      SET contato_nome = EXCLUDED.contato_nome
+      WHERE vendedores_bling.contato_nome IS NULL
+  `);
+
   // Fase 1: cruzar dadosCompletosJson.vendedor.id com vendedores_bling.
   // Atualiza TODOS os cards (não só os nulos) — sobrescreve round-robin com o vendedor real do pedido.
   const r1 = await db.execute<{ count: number }>(drizzleSql`
