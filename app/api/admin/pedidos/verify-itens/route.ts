@@ -108,6 +108,15 @@ export async function POST(req: Request) {
       erros++;
       detalhes.push({ pedido: row.numero, soma_antes: row.soma_itens, total: row.total, itens_depois: -1, ok: false });
       console.error(`[verify-itens] pedido ${pedidoId} (bling ${idBling}):`, err);
+      // Pedido inacessível no Bling — limpa itens para não ficar em loop infinito
+      try {
+        await db.delete(pedidoItens).where(drizzleSql`pedido_id = ${pedidoId}`);
+        await db.execute(drizzleSql`
+          UPDATE pedidos SET dados_completos_json = jsonb_set(
+            COALESCE(dados_completos_json, '{}'), '{itens}', '[]'
+          ), atualizado_em = now() WHERE id = ${pedidoId}
+        `);
+      } catch {}
     }
   }
 
