@@ -257,7 +257,7 @@ export function KanbanBoard({
             <div className="flex items-center gap-2">
               <span className="text-sm font-medium">Tipo</span>
               <div className="flex gap-1">
-                {([null, 'pos_venda', 'reativacao'] as const).map((t) => (
+                {([null, 'pos_venda', 'reativacao', 'aniversario'] as const).map((t) => (
                   <button
                     key={t ?? 'todos'}
                     onClick={() => aplicarFiltro({ tipo: t })}
@@ -267,7 +267,13 @@ export function KanbanBoard({
                         : 'bg-background text-foreground border-border hover:bg-muted'
                     }`}
                   >
-                    {t === null ? 'Todos' : t === 'pos_venda' ? 'Pós-venda' : 'Reativação'}
+                    {t === null
+                      ? 'Todos'
+                      : t === 'pos_venda'
+                      ? 'Pós-venda'
+                      : t === 'reativacao'
+                      ? 'Reativação'
+                      : 'Aniversário'}
                   </button>
                 ))}
               </div>
