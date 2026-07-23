@@ -67,3 +67,16 @@ export function toJSDate(input: DateTime): Date {
 export function fromJSDate(input: Date): DateTime {
   return DateTime.fromJSDate(input).setZone(TZ) as DateTimeMaybeValid as DateTime;
 }
+
+// Calcula a próxima ocorrência de um mês/dia a partir de hoje (inclusive).
+// Feb 29 em ano não-bissexto: Luxon faz overflow para Mar 1 automaticamente.
+export function proximoAniversario(dataNasc: Date | DateTime, hoje?: DateTime): DateTime {
+  const nasc =
+    dataNasc instanceof DateTime
+      ? (dataNasc.setZone(TZ) as DateTime)
+      : (DateTime.fromJSDate(dataNasc).setZone(TZ) as DateTime);
+  const ref = hoje ?? nowBRT();
+  const esteAno = nasc.set({ year: ref.year });
+  if (esteAno >= ref.startOf('day')) return esteAno;
+  return nasc.set({ year: ref.year + 1 });
+}

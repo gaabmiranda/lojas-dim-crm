@@ -46,11 +46,17 @@ export function CardItem({ card, modoSelecao, selecionado, onToggle }: CardItemP
   const prazo = prazoInfo(card.dataPrevistaAcao);
 
   const tipoLabel =
-    card.tipo === 'pos_venda' ? 'Pós-venda' : 'Reativação';
+    card.tipo === 'pos_venda'
+      ? 'Pós-venda'
+      : card.tipo === 'reativacao'
+      ? 'Reativação'
+      : 'Aniversário';
   const tipoColor =
     card.tipo === 'pos_venda'
       ? 'bg-blue-50 text-blue-700 border-blue-200'
-      : 'bg-amber-50 text-amber-700 border-amber-200';
+      : card.tipo === 'reativacao'
+      ? 'bg-amber-50 text-amber-700 border-amber-200'
+      : 'bg-purple-50 text-purple-700 border-purple-200';
 
   function handleClick() {
     if (modoSelecao) {

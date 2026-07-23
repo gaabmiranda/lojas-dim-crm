@@ -18,12 +18,13 @@ import {
 } from 'drizzle-orm/pg-core';
 
 // ─── Enums ─────────────────────────────────────────────────────────────────
-export const tipoCardEnum = pgEnum('tipo_card', ['pos_venda', 'reativacao']);
+export const tipoCardEnum = pgEnum('tipo_card', ['pos_venda', 'reativacao', 'aniversario']);
 export const colunaCardEnum = pgEnum('coluna_card', [
   'pendente',
   'em_contato',
   'finalizado',
   'arquivo',
+  'pausado',
 ]);
 export const statusAtividadeEnum = pgEnum('status_atividade', [
   'pendente',
@@ -45,6 +46,7 @@ export const contatos = pgTable(
     email: text('email'),
     situacaoBling: text('situacao_bling'),
     dadosExtrasJson: jsonb('dados_extras_json'),
+    dataAniversario: date('data_aniversario', { mode: 'date' }),
     freezingAte: timestamp('freezing_ate', { withTimezone: true, mode: 'date' }),
     criadoEm: timestamp('criado_em', { withTimezone: true, mode: 'date' })
       .notNull()
@@ -57,6 +59,9 @@ export const contatos = pgTable(
     idBlingUnique: uniqueIndex('contatos_id_bling_unique').on(t.idBling),
     freezingAteIdx: index('contatos_freezing_ate_idx').on(t.freezingAte),
     nomeIdx: index('contatos_nome_idx').on(t.nome),
+    aniversarioIdx: index('contatos_aniversario_idx')
+      .on(t.dataAniversario)
+      .where(sql`${t.dataAniversario} IS NOT NULL`),
   }),
 );
 
@@ -150,10 +155,10 @@ export const cards = pgTable(
     colunaDataIdx: index('cards_coluna_data_idx').on(t.coluna, t.dataPrevistaAcao),
     colunaDesdeIdx: index('cards_coluna_desde_idx').on(t.colunaDeSde),
     contatoIdx: index('cards_contato_idx').on(t.contatoId),
-    // Partial unique: 1 card ativo por contato (coluna != 'arquivo')
+    // Partial unique: 1 card ativo por contato (exclui arquivo e pausado — permite 1 ativo + 1 pausado)
     contatoAtivoUnique: uniqueIndex('cards_contato_ativo_unique')
       .on(t.contatoId)
-      .where(sql`${t.coluna} != 'arquivo'`),
+      .where(sql`${t.coluna} NOT IN ('arquivo', 'pausado')`),
   }),
 );
 

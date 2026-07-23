@@ -57,6 +57,13 @@
       "when": 1782000000000,
       "tag": "0007_dedup_pedido_itens",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1753142400000,
+      "tag": "0008_aniversario",
+      "breakpoints": true
     }
   ]
 }

@@ -5,7 +5,8 @@ import { cards, contatos, pedidoItens, pedidos, vendedoresBling } from '@/db/sch
 import { logEvent } from '@/lib/audit';
 import { getFlag, setFlag } from '@/lib/feature-flags';
 import { getContato, getPedido, listPedidos } from '@/lib/bling/client';
-import { extrairTelefone, mapContato, mapPedido } from '@/lib/bling/mapper';
+import { extrairTelefone, mapContato, mapPedido, parseDate } from '@/lib/bling/mapper';
+import { upsertBirthdayCard } from '@/lib/birthday';
 import { SITUACAO_VALOR } from '@/lib/bling/types';
 import { verifyN8nSecret } from '@/lib/n8n/trigger';
 import { transicaoPorNovaCompra } from '@/lib/kanban';
@@ -301,15 +302,34 @@ async function fetchAndSaveContato(contatoId: number, idBlingContato: number): P
   try {
     const fullContato = await getContato(idBlingContato);
     const telefone = extrairTelefone(fullContato);
-    // Só atualiza se o Bling retornou telefone e o campo ainda está vazio (evita sobrescrever edição manual).
-    if (!telefone) return;
+    const dataNasc = fullContato.dataNascimento ? parseDate(fullContato.dataNascimento) : null;
+
+    // Salva dados extras e campos complementares; COALESCE preserva valores já preenchidos.
     await db.execute(drizzleSql`
       UPDATE contatos
-      SET telefone = ${telefone},
-          dados_extras_json = ${JSON.stringify(fullContato)}::jsonb,
+      SET dados_extras_json = ${JSON.stringify(fullContato)}::jsonb,
+          telefone = COALESCE(telefone, ${telefone ?? null}),
+          data_aniversario = COALESCE(data_aniversario, ${dataNasc}),
           atualizado_em = now()
-      WHERE id = ${contatoId} AND telefone IS NULL
+      WHERE id = ${contatoId}
     `);
+
+    if (dataNasc) {
+      const [c] = await db
+        .select({ nome: contatos.nome })
+        .from(contatos)
+        .where(eq(contatos.id, contatoId))
+        .limit(1);
+      if (c) {
+        const [cardRecente] = await db
+          .select({ vendedorId: cards.vendedorId })
+          .from(cards)
+          .where(drizzleSql`contato_id = ${contatoId} AND coluna != 'arquivo'`)
+          .orderBy(cards.criadoEm)
+          .limit(1);
+        await upsertBirthdayCard(contatoId, dataNasc, c.nome, cardRecente?.vendedorId ?? null);
+      }
+    }
   } catch (err) {
     console.error(`[delta-sync] fetchAndSaveContato contato ${contatoId} (bling ${idBlingContato}):`, err);
   }

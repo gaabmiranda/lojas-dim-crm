@@ -6,6 +6,7 @@ import { cards, colunaCardEnum, pedidos } from '@/db/schema';
 import { auth } from '@/lib/auth';
 import { logEvent } from '@/lib/audit';
 import { addDays, addHours } from '@/lib/time';
+import { activateNextPausado, renewBirthdayCard } from '@/lib/birthday';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -88,6 +89,14 @@ export async function PATCH(req: Request, { params }: RouteParams) {
     .returning();
 
   if (!updated) return new NextResponse('not found', { status: 404 });
+
+  // Quando arquivado manualmente: renova aniversário (se aplicável) e ativa próximo pausado.
+  if (parsed.data.coluna === 'arquivo') {
+    if (updated.tipo === 'aniversario') {
+      await renewBirthdayCard(updated.contatoId, updated.nomeExibido, updated.vendedorId);
+    }
+    await activateNextPausado(updated.contatoId);
+  }
 
   await logEvent({
     tipo: 'card_patch',

@@ -12,6 +12,7 @@ export interface BlingContato {
   celular?: string;
   email?: string;
   situacao?: BlingContatoSituacao;
+  dataNascimento?: string; // YYYY-MM-DD — campo nativo do Bling v3
   tiposContato?: Array<{ id: number; descricao: string }>;
   endereco?: {
     geral?: {

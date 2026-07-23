@@ -27,7 +27,7 @@ export function mapContato(c: BlingContato): NewContato {
   };
 }
 
-function parseDate(s: string | undefined): Date | null {
+export function parseDate(s: string | undefined): Date | null {
   if (!s) return null;
   // Bling envia "YYYY-MM-DD". new Date("2026-06-15") → meia-noite UTC.
   // Preservamos a data calendario interpretando como meia-noite BRT.
