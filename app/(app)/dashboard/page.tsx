@@ -44,7 +44,7 @@ async function queryMetricas(startStr: string, endStr: string) {
       COUNT(*)::int AS total_pedidos,
       COUNT(DISTINCT contato_id)::int AS clientes_unicos
     FROM pedidos
-    WHERE situacao_valor = 9
+    WHERE situacao_id = 9
       AND data >= ${startStr}::date
       AND data < ${endStr}::date
   `);
@@ -83,7 +83,7 @@ async function queryTopClientes(startStr: string, endStr: string) {
       COUNT(p.id)::int AS num_pedidos
     FROM pedidos p
     JOIN contatos c ON c.id = p.contato_id
-    WHERE p.situacao_valor = 9
+    WHERE p.situacao_id = 9
       AND p.data >= ${startStr}::date
       AND p.data < ${endStr}::date
     GROUP BY c.id, c.nome
@@ -99,7 +99,7 @@ async function queryTendencia() {
       COALESCE(SUM(total::numeric), 0)::text AS faturamento,
       COUNT(*)::int AS pedidos
     FROM pedidos
-    WHERE situacao_valor = 9
+    WHERE situacao_id = 9
       AND data >= (DATE_TRUNC('month', NOW()) - INTERVAL '5 months')
     GROUP BY 1
     ORDER BY 1
