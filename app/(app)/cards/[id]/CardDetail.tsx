@@ -179,6 +179,7 @@ const COLUNA_LABELS: Record<string, string> = {
   em_contato: 'Em Contato',
   finalizado: 'Finalizado',
   arquivo: 'Arquivado',
+  pausado: 'Pausado',
 };
 
 function EtapaStepper({ card }: { card: Pick<CardData, 'id' | 'coluna' | 'tipo'> }) {
@@ -219,6 +220,14 @@ function EtapaStepper({ card }: { card: Pick<CardData, 'id' | 'coluna' | 'tipo'>
     );
   }
 
+  if (card.coluna === 'pausado') {
+    return (
+      <span className="inline-block text-xs bg-purple-50 text-purple-700 border border-purple-200 px-2 py-1 rounded">
+        Aguardando — outro card tem prioridade no momento
+      </span>
+    );
+  }
+
   return (
     <div className="space-y-2">
       {/* Segmented control — 1 clique para qualquer etapa */}
@@ -226,7 +235,7 @@ function EtapaStepper({ card }: { card: Pick<CardData, 'id' | 'coluna' | 'tipo'>
         {COLUNAS_ORDER.map((c, i) => {
           const isCurrent = c === card.coluna;
           const isPast = i < currentIdx;
-          const isFinalizar = c === 'finalizado' && card.tipo === 'pos_venda';
+          const isFinalizar = c === 'finalizado' && (card.tipo === 'pos_venda' || card.tipo === 'aniversario');
           return (
             <button
               key={c}
@@ -331,10 +340,14 @@ function Header({
     : stats.diasSemComprar > 60 ? 'text-amber-600'
     : 'text-green-600';
 
-  const tipoLabel = card.tipo === 'pos_venda' ? 'Pós-venda' : 'Reativação';
-  const tipoColor = card.tipo === 'pos_venda'
-    ? 'bg-blue-50 text-blue-700 border-blue-200'
-    : 'bg-amber-50 text-amber-700 border-amber-200';
+  const tipoLabel =
+    card.tipo === 'pos_venda' ? 'Pós-venda'
+    : card.tipo === 'reativacao' ? 'Reativação'
+    : 'Aniversário';
+  const tipoColor =
+    card.tipo === 'pos_venda' ? 'bg-blue-50 text-blue-700 border-blue-200'
+    : card.tipo === 'reativacao' ? 'bg-amber-50 text-amber-700 border-amber-200'
+    : 'bg-purple-50 text-purple-700 border-purple-200';
 
   function abrirWhatsapp() {
     const fone = card.contato.telefone;
@@ -540,10 +553,12 @@ function CardsAnterioresSection({ cards }: { cards: CardAnterior[] }) {
   const TIPO_COLOR: Record<string, string> = {
     pos_venda: 'bg-blue-50 text-blue-700 border-blue-200',
     reativacao: 'bg-amber-50 text-amber-700 border-amber-200',
+    aniversario: 'bg-purple-50 text-purple-700 border-purple-200',
   };
   const TIPO_LABEL: Record<string, string> = {
     pos_venda: 'Pós-venda',
     reativacao: 'Reativação',
+    aniversario: 'Aniversário',
   };
 
   return (
